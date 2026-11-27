@@ -3388,6 +3388,20 @@ select.sk-input{appearance:auto;-webkit-appearance:auto}
 .zelle-src-gaz{background:rgba(96,165,250,.12);color:#60a5fa;}
 .zelle-src-autre{background:rgba(167,139,250,.12);color:#a78bfa;}
 
+/* ── Livrezon kabiran (app Resepsyon) ── */
+.lvk-b{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.lvk-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.lvk-kpi{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--c);border-radius:14px;padding:14px}
+.lvk-kl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.lvk-kv{font-size:24px;font-weight:800;margin:4px 0}
+.lvk-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:14px}
+.lvk-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:14px}
+.lvk-filtres{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:end}
+.lvk-filtres label,.lvk-f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.lvk-filtres input,.lvk-filtres select,.lvk-f input{font:inherit;font-size:13px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 9px}
+.lvk-stock{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.lvk-sl{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--border)}
+.lvk-editbox{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:12px}
 /* ── Rapports pompistes (supervision) ─────────────────────────────── */
 .psp-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
 .psp-sm{font-size:12.5px;border-left:3px solid var(--orange);padding:4px 8px;background:rgba(249,115,22,.06);border-radius:4px}
@@ -3933,6 +3947,14 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       </span>
       <span>Rapports pompistes</span>
       <span class="nav-badge" id="psp-nav-badge" style="display:none;margin-left:auto;background:var(--orange);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:1px 7px"></span>
+      <span class="nav-active-dot"></span>
+    </button>
+
+    <button class="nav-item" data-page="livrezon-kabiran" onclick="goTo('livrezon-kabiran')">
+      <span class="nav-icon">
+        <svg viewBox="0 0 24 24"><path d="M1 6h13v10H1z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="5.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>
+      </span>
+      <span>Livraisons carburant</span>
       <span class="nav-active-dot"></span>
     </button>
 
@@ -4733,6 +4755,16 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
       <div id="cp-contenu"></div>
     </div>
 
+    <div id="page-livrezon-kabiran" class="page">
+      <div class="psp-tabs">
+        <button class="psp-tab lvk-tab on" data-t="dashboard" onclick="lvkOnglet('dashboard')">📊 Tableau de bord</button>
+        <button class="psp-tab lvk-tab" data-t="liste" onclick="lvkOnglet('liste')">🚚 Livraisons</button>
+        <button class="psp-tab lvk-tab" data-t="kont" onclick="lvkOnglet('kont')">Comptes de réception</button>
+        <button class="psp-tab lvk-tab" data-t="notif" onclick="lvkOnglet('notif')">Notifications</button>
+        <button class="psp-tab lvk-tab" data-t="app" onclick="lvkOnglet('app')">📲 Application</button>
+      </div>
+      <div id="lvk-contenu"></div>
+    </div>
     <div id="page-pompistes-rapports" class="page">
       <div class="psp-tabs">
         <button class="psp-tab on" data-t="rapports" onclick="pspOnglet('rapports')">Rapports <span id="psp-nb"></span></button>
@@ -15148,6 +15180,7 @@ const PAGE_META={
   geo:                 {title: 'Carte des stations',             sub: 'Geospatial Station Intelligence Center — vos stations sur la carte d’Haïti'},
   intelligence:        {title: 'KONEKTA Intelligence Center',   sub: 'Analyse de gestion — revenu, charges, trésorerie, opérations, départements'},
   'caisse-principale': {title: 'Caisse principale',             sub: 'Entrées d\'argent par source (stations, autres) et total de la caisse'},
+  'livrezon-kabiran':{title: 'Livraisons carburant',          sub: 'Gaz entré dans les stations : réceptions, commandes en cours, écarts, graphiques'},
   'pompistes-rapports':{title: 'Rapports pompistes',            sub: 'Confirmer, corriger ou refuser les compteurs soumis par les pompistes'},
   journal:             {title: ()=>t('page.journal.title'),     sub: ()=>t('page.journal.sub')},
   'carburant-rapport': {title: 'Rapport Journalier',            sub: 'Caisse carburant — entrées, dépenses, disponible du jour'},
@@ -15250,6 +15283,7 @@ function goTo(page){
   if(page==='dashboard')          initDashboard();
   if(page==='saisie')             loadSaisie();
   if(page==='pompistes-rapports') loadPompistesRapports();
+  if(page==='livrezon-kabiran')   loadLivrezonKabiran();
   if(page==='caisse-principale')  loadCaissePrincipale();
   if(page==='intelligence' && window.initIntelligence) initIntelligence();
   if(page==='journal')            initJournal();
@@ -19804,7 +19838,7 @@ function _bandeauEnvironnement(env){
 // de Bord Gestion », « Achats » et « Payroll » agrègent/gèrent tout
 // l'établissement, pas seulement le carburant).
 const _MODULE_PAGES = {
-  carburant: ['home','dashboard','saisie','pompistes-rapports','caisse-principale','journal','carburant-rapport','rapport-analytique','statistiques',
+  carburant: ['home','dashboard','saisie','pompistes-rapports','livrezon-kabiran','caisse-principale','journal','carburant-rapport','rapport-analytique','statistiques',
               'previsions','rapports','stock','gestion','audit','depenses'],
   bar:       ['pos-dashboard-bar','pos-caisse','pos-produits','pos-stock','pos-achats',
               'pos-ventes','pos-credits','pos-commandes','pos-paie','pos-rentabilite',
@@ -19834,7 +19868,7 @@ function _pageModuleEnabled(page){
 // ── Matrice de pages par domaine fonctionnel ─────────────────────
 const _AREA_PAGES = {
   carburant: {
-    complet: ['home','saisie','pompistes-rapports','caisse-principale'],
+    complet: ['home','saisie','pompistes-rapports','livrezon-kabiran','caisse-principale'],
     lecture: ['home'],
   },
   finance: {
@@ -19874,7 +19908,7 @@ const _CAISSIER_ALLOWED = new Set([
 const _MANAGER_ALLOWED = new Set([
   'pos-caisse','pos-produits','pos-caisses','pos-scan-livraison','pos-achats','pos-ventes','pos-credits',
   'pos-stock','pos-paie','pos-rentabilite','pos-analyse','pos-sessions-caisse','rapports-soumis',
-  'pos-fournisseurs','pompistes-rapports','caisse-principale','intelligence','geo',
+  'pos-fournisseurs','pompistes-rapports','livrezon-kabiran','caisse-principale','intelligence','geo',
   'hotel-dashboard','hotel-sejours','hotel-proforma','hotel-historique','hotel-employes','hotel-depenses','hotel-rapport',
   'cuisine-caisse','cuisine-plats','cuisine-depenses','cuisine-ventes','cuisine-stats','cuisine-achats','cuisine-analyse',
   'patisserie-dashboard','patisserie-produits','patisserie-achats','patisserie-ventes','patisserie-commandes','patisserie-depenses','patisserie-caisse',
@@ -19884,7 +19918,7 @@ const _MANAGER_ALLOWED = new Set([
 
 // Assistant Directeur — tous les rapports en lecture + Zelle complet
 const _AD_ALLOWED = new Set([
-  'home','pompistes-rapports','caisse-principale','intelligence','geo',
+  'home','pompistes-rapports','livrezon-kabiran','caisse-principale','intelligence','geo',
   'dashboard','journal','carburant-rapport','statistiques','gi-dashboard','depenses','achats','caisse',
   'pos-produits','pos-caisses','pos-scan-livraison','pos-stock','pos-ventes','pos-credits','pos-commandes',
   'pos-analyse','pos-grande-caisse','pos-rentabilite','pos-sessions-caisse','rapports-soumis',
@@ -42209,6 +42243,256 @@ async function zelleImprimerFiche(id){
   else _bind();
 })();
 
+</script>
+<script>
+/* ══ Livrezon kabiran — tableau de bord des entrées de carburant (app Resepsyon) ══ */
+const LVK = {onglet: 'dashboard', charts: {}, station: '', debut: '', fin: '', filtre: ''};
+const _lvkST = {VALIDE:'Valide', AN_WOUT:'An wout', RESEVWA:'Resevwa', FEMEN:'Fèmen', EKAT:'Ekat', REJTE:'Rejte', ANILE:'Anile'};
+const _lvkCol = {VALIDE:'#3b82f6', AN_WOUT:'#f59e0b', RESEVWA:'#22c55e', FEMEN:'#22c55e', EKAT:'#ef4444', REJTE:'#ef4444', ANILE:'#7a9bbb'};
+const _lvkE = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const _lvkG = x => x == null ? '—' : Number(x).toLocaleString('fr-FR', {maximumFractionDigits: 3}) + ' gal';
+const _lvkDt = s => s ? new Date(s).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
+const _lvkB = s => `<span class="lvk-b" style="--c:${_lvkCol[s] || '#7a9bbb'}">${_lvkST[s] || s}</span>`;
+
+function loadLivrezonKabiran(){ lvkOnglet(LVK.onglet || 'dashboard'); }
+
+async function lvkOnglet(t){
+  LVK.onglet = t;
+  document.querySelectorAll('.lvk-tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  const c = document.getElementById('lvk-contenu');
+  c.innerHTML = '<div class="psp-muted">Chargement…</div>';
+  try{
+    if(t === 'dashboard') await lvkDashboard();
+    else if(t === 'liste') await lvkListe();
+    else if(t === 'kont') await lvkKont();
+    else if(t === 'notif') await lvkNotif();
+    else lvkApp();
+  }catch(e){ c.innerHTML = `<div class="psp-card" style="color:var(--red2)">${_lvkE(e.message)}</div>`; }
+}
+
+function _lvkFiltres(avecRecherche){
+  return `<div class="lvk-filtres">
+    <label>Du <input type="date" value="${LVK.debut}" onchange="LVK.debut=this.value;lvkOnglet(LVK.onglet)"></label>
+    <label>Au <input type="date" value="${LVK.fin}" onchange="LVK.fin=this.value;lvkOnglet(LVK.onglet)"></label>
+    <label>Station <select onchange="LVK.station=this.value;lvkOnglet(LVK.onglet)"><option value="">Toutes</option>
+      ${(LVK.stations || []).map(s => `<option value="${s.id}" ${String(s.id) === String(LVK.station) ? 'selected' : ''}>${_lvkE(s.nom)}</option>`).join('')}</select></label>
+    ${avecRecherche ? `<label>Statut <select onchange="LVK.filtre=this.value;lvkOnglet('liste')"><option value="">Tous</option>
+      ${Object.keys(_lvkST).map(s => `<option value="${s}" ${LVK.filtre === s ? 'selected' : ''}>${_lvkST[s]}</option>`).join('')}</select></label>
+      <label>Recherche <input placeholder="N°, bon, chauffeur, plaque…" value="${_lvkE(LVK.q || '')}" onkeydown="if(event.key==='Enter'){LVK.q=this.value;lvkOnglet('liste')}"></label>` : ''}
+  </div>`;
+}
+function _lvkQs(){
+  const p = new URLSearchParams();
+  if(LVK.debut) p.set('debut', LVK.debut);
+  if(LVK.fin) p.set('fin', LVK.fin);
+  if(LVK.station !== '') p.set('station_id', LVK.station);
+  return p;
+}
+
+async function lvkDashboard(){
+  const d = await GET('/livrezon-admin/dashboard?' + _lvkQs());
+  LVK.stations = d.stations;
+  if(!LVK.debut) LVK.debut = d.debut;
+  if(!LVK.fin) LVK.fin = d.fin;
+  const k = d.kpi, c = document.getElementById('lvk-contenu');
+  const tuile = (l, v, s, col) => `<div class="lvk-kpi" style="--c:${col}"><div class="lvk-kl">${l}</div><div class="lvk-kv">${v}</div><div class="psp-muted">${s}</div></div>`;
+  const ligne = l => `<tr onclick="lvkDetail(${l.id})" style="cursor:pointer"><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.date_livrezon)}</td>
+    <td>${_lvkE(l.station_nom)}</td><td>${_lvkE(l.produit_nom)}</td><td class="r">${_lvkG(l.kantite_voye)}</td>
+    <td>${_lvkE(l.konpayi)}</td><td>${_lvkE(l.plak_kamyon)}</td><td>${_lvkB(l.statut)}</td></tr>`;
+  const tete = '<tr><th>N°</th><th>Date</th><th>Station</th><th>Produit</th><th class="r">Gallons</th><th>Compagnie</th><th>Camion</th><th>Statut</th></tr>';
+  const repart = (titre, rows) => `<div class="psp-card"><div class="psp-head"><b>${titre}</b></div>${rows.length ? `<table class="psp-tbl">
+      <tr><th></th><th class="r">Gallons reçus</th><th class="r">Livraisons</th><th class="r">Valeur (G)</th></tr>
+      ${rows.map(r => `<tr><td>${_lvkE(r.non)}</td><td class="r">${_lvkG(r.galon)}</td><td class="r">${r.kantite}</td>
+      <td class="r">${r.valeur ? Number(r.valeur).toLocaleString('fr-FR', {maximumFractionDigits: 0}) : '—'}</td></tr>`).join('')}</table>`
+      : '<div class="psp-muted">Aucune livraison reçue sur la période.</div>'}</div>`;
+  c.innerHTML = `${_lvkFiltres(false)}
+    <div class="lvk-kpis">
+      ${tuile('Gaz entré (reçu)', _lvkG(k.galon_resevwa), `${k.nb_resevwa} livraison(s) reçue(s)`, '#22c55e')}
+      ${tuile('Commandes en cours', k.nb_en_kou, `${_lvkG(k.galon_en_kou)} attendus`, '#f59e0b')}
+      ${tuile('Écarts (alertes)', k.nb_ekat, `envoyé − reçu : ${_lvkG(k.ekat_total)}`, k.nb_ekat ? '#ef4444' : '#7a9bbb')}
+      ${tuile('Valeur reçue', k.valeur ? Number(k.valeur).toLocaleString('fr-FR', {maximumFractionDigits: 0}) + ' G' : '—', 'gallons reçus × prix / gallon', '#3b82f6')}
+    </div>
+    <div class="lvk-grid2">
+      <div class="psp-card"><div class="psp-head"><b>Gallons reçus par jour</b><span class="psp-muted">${frDate(d.debut)} → ${frDate(d.fin)}</span></div>
+        <div style="height:260px"><canvas id="lvk-ch-jour"></canvas></div></div>
+      <div class="psp-card"><div class="psp-head"><b>Statut des livraisons</b></div><div style="height:260px"><canvas id="lvk-ch-statut"></canvas></div></div>
+    </div>
+    <div class="psp-card"><div class="psp-head"><b>🚚 Commandes en cours (à recevoir)</b><span class="psp-muted">toutes dates</span></div>
+      ${d.en_kou.length ? `<div style="overflow-x:auto"><table class="psp-tbl">${tete}${d.en_kou.map(ligne).join('')}</table></div>` : '<div class="psp-muted">Aucune commande en attente.</div>'}</div>
+    ${d.ekat.length ? `<div class="psp-card" style="border-color:rgba(239,68,68,.5)"><div class="psp-head"><b style="color:var(--red2)">⚠ Livraisons en écart</b></div>
+      <div style="overflow-x:auto"><table class="psp-tbl"><tr><th>N°</th><th>Date</th><th>Station</th><th>Produit</th><th class="r">Envoyé</th><th class="r">Reçu</th><th class="r">Écart</th><th></th></tr>
+      ${d.ekat.map(l => `<tr><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.resevwa_at)}</td><td>${_lvkE(l.station_nom)}</td><td>${_lvkE(l.produit_nom)}</td>
+        <td class="r">${_lvkG(l.kantite_voye)}</td><td class="r">${_lvkG(l.kantite_resevwa)}</td><td class="r" style="color:var(--red2)">${_lvkG(l.ekat)}</td>
+        <td><button class="psp-tab" onclick="lvkDetail(${l.id})">Voir</button></td></tr>`).join('')}</table></div></div>` : ''}
+    <div class="lvk-grid3">${repart('Par produit', d.par_produit)}${repart('Par station', d.par_station)}${repart('Par compagnie', d.par_konpayi)}</div>
+    <div class="psp-card"><div class="psp-head"><b>🛢 Stock actuel des stations</b><span class="psp-muted">mis à jour à chaque réception</span></div>
+      <div class="lvk-grid3">${d.stock.map(s => `<div class="lvk-stock"><b>${_lvkE(s.station_nom)}</b>${s.produits.map(p => `<div class="lvk-sl">
+        <span>${_lvkE(p.nom)}</span><span style="color:${p.alerte_bas ? 'var(--red2)' : 'var(--text)'}">${_lvkG(p.stock)}${p.jours_de_stock != null ? ` · ${p.jours_de_stock} j` : ''}</span></div>`).join('')
+        || '<div class="psp-muted">Aucun produit</div>'}</div>`).join('')}</div></div>`;
+  Object.values(LVK.charts).forEach(ch => { try{ ch.destroy(); }catch(_){} });
+  LVK.charts = {};
+  if(typeof Chart === 'undefined') return;
+  const pal = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
+  LVK.charts.jour = new Chart(document.getElementById('lvk-ch-jour'), {type: 'bar',
+    data: {labels: d.jours.map(j => j.slice(8, 10) + '/' + j.slice(5, 7)),
+           datasets: d.par_jour.map((s, i) => ({label: s.produit, data: s.valeurs, backgroundColor: pal[i % pal.length], borderRadius: 4}))},
+    options: {maintainAspectRatio: false, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true}}, plugins: {legend: {position: 'bottom'}}}});
+  const st = Object.entries(d.statuts).filter(([, n]) => n > 0);
+  LVK.charts.statut = new Chart(document.getElementById('lvk-ch-statut'), {type: 'doughnut',
+    data: {labels: st.map(([s]) => _lvkST[s]), datasets: [{data: st.map(([, n]) => n), backgroundColor: st.map(([s]) => _lvkCol[s])}]},
+    options: {maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}});
+}
+
+async function lvkListe(){
+  if(!LVK.stations) LVK.stations = (await GET('/livrezon-admin/dashboard')).stations;
+  const p = _lvkQs();
+  if(LVK.filtre) p.set('statut', LVK.filtre);
+  if(LVK.q) p.set('q', LVK.q);
+  const L = (await GET('/livrezon-admin/livrezon?' + p)).livrezons;
+  document.getElementById('lvk-contenu').innerHTML = `${_lvkFiltres(true)}
+    <div class="psp-card"><div class="psp-head"><b>${L.length} livraison(s)</b></div>
+    ${L.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><tr><th>N°</th><th>Date</th><th>Station</th><th>Produit</th><th class="r">Envoyé</th><th class="r">Reçu</th>
+      <th>Bon</th><th>Compagnie</th><th>Chauffeur</th><th>Camion</th><th>Statut</th><th></th></tr>
+      ${L.map(l => `<tr><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.date_livrezon)}</td><td>${_lvkE(l.station_nom)}</td><td>${_lvkE(l.produit_nom)}</td>
+        <td class="r">${_lvkG(l.kantite_voye)}</td><td class="r">${_lvkG(l.kantite_resevwa)}</td><td>${_lvkE(l.no_bon)}</td><td>${_lvkE(l.konpayi)}</td>
+        <td>${_lvkE(l.chofe)}</td><td>${_lvkE(l.plak_kamyon)}</td><td>${_lvkB(l.statut)}</td>
+        <td style="white-space:nowrap"><button class="psp-tab" onclick="lvkDetail(${l.id})">Ouvrir</button>
+        <a class="psp-tab" style="text-decoration:none" href="/api/livrezon-admin/livrezon/${l.id}/pdf" target="_blank">PDF</a></td></tr>`).join('')}</table></div>`
+      : '<div class="psp-muted">Aucune livraison.</div>'}</div>`;
+}
+
+async function lvkDetail(id){
+  const l = await GET('/livrezon-admin/livrezon/' + id);
+  LVK.courant = l;
+  const kv = (k, v) => `<tr><td class="psp-muted">${k}</td><td>${v}</td></tr>`;
+  const enKou = l.statut === 'VALIDE' || l.statut === 'AN_WOUT';
+  document.getElementById('lvk-contenu').innerHTML = `
+    <button class="psp-tab" onclick="lvkOnglet(LVK.onglet)">← Retour</button>
+    <div class="psp-card" style="margin-top:10px"><div class="psp-head"><b>Livraison ${_lvkE(l.numero)} · ${_lvkE(l.station_nom)}</b>${_lvkB(l.statut)}</div>
+      <div class="lvk-grid2"><table class="psp-tbl">
+        ${kv('Produit', _lvkE(l.produit_nom))}${kv('Date & heure', _lvkDt(l.date_livrezon))}${kv('N° bon', _lvkE(l.no_bon))}
+        ${kv('N° contre-plein', _lvkE(l.no_kontre_plen || '—'))}${kv('Quantité envoyée', _lvkG(l.kantite_voye))}
+        ${kv('Prix / gallon', l.pri_galon == null ? '— (dernier prix d’achat de la station)' : l.pri_galon + ' G')}
+        ${kv('Compagnie', _lvkE(l.konpayi))}${kv('Chauffeur', _lvkE(l.chofe) + ' · ' + _lvkE(l.telefon_chofe))}${kv('Camion', _lvkE(l.plak_kamyon))}
+        ${kv('Commentaire', _lvkE(l.komante || '—'))}${kv('Saisie par', _lvkE(l.cree_par || '—') + ' · ' + _lvkDt(l.created_at))}
+      </table><table class="psp-tbl">
+        ${kv('Quantité reçue', _lvkG(l.kantite_resevwa))}${kv('Jauge avant / après', _lvkG(l.jog_avan) + ' / ' + _lvkG(l.jog_apre))}
+        ${kv('Écart (envoyé − reçu)', `<b style="color:${l.statut === 'EKAT' ? 'var(--red2)' : 'inherit'}">${_lvkG(l.ekat)}</b> <span class="psp-muted">tolérance ${_lvkG(l.tolerans)}</span>`)}
+        ${kv('Reçue par', _lvkE(l.resevwa_par || '—') + ' · ' + _lvkDt(l.resevwa_at))}${kv('Commentaire réception', _lvkE(l.komante_resepsyon || '—'))}
+        ${kv('Stock', l.livraison_id ? `Livraison #${l.livraison_id} dans le stock de ${_lvkE(l.station_nom)}` : '—')}
+        ${kv('Revue', _lvkE(l.revize_par || '—') + ' · ' + _lvkDt(l.revize_at))}${kv('Motif', _lvkE(l.motif || '—'))}
+      </table></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        ${l.statut === 'VALIDE' ? `<button class="psp-tab on" style="background:var(--green);border-color:var(--green)" onclick="lvkAction(${l.id},'apwouve')">✓ Approuver (en route)</button>` : ''}
+        ${enKou ? `<button class="psp-tab" onclick="lvkAction(${l.id},'rejte',true)">✕ Rejeter</button>` : ''}
+        ${l.statut === 'EKAT' ? `<button class="psp-tab" onclick="lvkAction(${l.id},'femen',true)">Clôturer l’écart</button>` : ''}
+        ${l.statut !== 'REJTE' && l.statut !== 'ANILE' ? `<button class="psp-tab" onclick="lvkModifier()">✎ Modifier</button>
+          <button class="psp-tab" onclick="lvkAction(${l.id},'anile',true)">Annuler${l.livraison_id ? ' (retire du stock)' : ''}</button>` : ''}
+        <a class="psp-tab" style="text-decoration:none" href="/api/livrezon-admin/livrezon/${l.id}/pdf" target="_blank">📄 Fiche PDF</a>
+      </div><div id="lvk-edit"></div></div>
+    <div class="lvk-grid2">
+      <div class="psp-card"><div class="psp-head"><b>Journal d’audit</b></div><table class="psp-tbl"><tr><th>Quand</th><th>Action</th><th>Statut</th><th>Par</th><th>Détail</th></tr>
+        ${l.jounal.map(j => `<tr><td>${_lvkDt(j.at)}</td><td>${_lvkE(j.aksyon)}</td><td>${j.ansyen_statut ? _lvkST[j.ansyen_statut] + ' → ' : ''}${_lvkST[j.nouvo_statut] || ''}</td>
+          <td>${_lvkE(j.itilizate || '—')}</td><td class="psp-muted" style="max-width:260px;overflow-wrap:anywhere">${j.detay ? _lvkE(JSON.stringify(j.detay)) : ''}</td></tr>`).join('')}</table></div>
+      <div class="psp-card"><div class="psp-head"><b>Notifications</b></div>${l.notifikasyon.length ? `<table class="psp-tbl"><tr><th>Quand</th><th>Événement</th><th>Canal</th><th>Destinataire</th><th>Résultat</th></tr>
+        ${l.notifikasyon.map(n => `<tr><td>${_lvkDt(n.at)}</td><td>${n.evenman}</td><td>${n.kanal}</td><td>${_lvkE(n.destinate)}</td>
+          <td>${n.statut}${n.eseye > 1 ? ` (${n.eseye} essais)` : ''}${n.ranplasman ? ' → repli ' + n.ranplasman : ''}</td></tr>`).join('')}</table>`
+        : '<div class="psp-muted">Aucune (ou envoi en cours).</div>'}</div>
+    </div>`;
+}
+
+async function lvkAction(id, action, motifRequis){
+  let motif = null;
+  if(motifRequis){
+    motif = prompt({rejte: 'Motif du rejet :', femen: 'Conclusion après vérification de l’écart :', anile: 'Motif de l’annulation :'}[action] || 'Motif :');
+    if(motif == null) return;
+    if(motif.trim().length < 3) return notify('Écrivez le motif.', 'err');
+  }
+  try{ await POST(`/livrezon-admin/livrezon/${id}/${action}`, {motif}); notify('Enregistré.', 'ok'); lvkDetail(id); }
+  catch(e){ notify(e.message, 'err'); }
+}
+
+function lvkModifier(){
+  const l = LVK.courant, recu = l.livraison_id != null;
+  const ch = (id, lab, val, type = 'text') => `<label class="lvk-f">${lab}<input id="lvke-${id}" type="${type}" ${type === 'number' ? 'step="0.001"' : ''} value="${_lvkE(val ?? '')}"></label>`;
+  document.getElementById('lvk-edit').innerHTML = `<div class="lvk-editbox"><div class="lvk-grid3">
+    ${ch('no_bon', 'N° bon', l.no_bon)}${ch('no_kontre_plen', 'N° contre-plein', l.no_kontre_plen)}${ch('kantite_voye', 'Quantité envoyée (gal)', l.kantite_voye, 'number')}
+    ${recu ? ch('kantite_resevwa', 'Quantité reçue (gal)', l.kantite_resevwa, 'number') : ''}${ch('pri_galon', 'Prix / gallon (G)', l.pri_galon, 'number')}
+    ${ch('konpayi', 'Compagnie', l.konpayi)}${ch('chofe', 'Chauffeur', l.chofe)}${ch('telefon_chofe', 'Téléphone (+509…)', l.telefon_chofe)}
+    ${ch('plak_kamyon', 'Plaque', l.plak_kamyon)}${ch('komante', 'Commentaire', l.komante)}</div>
+    <div class="psp-muted" style="margin:6px 0">${recu ? 'Déjà reçue : le stock de la station est corrigé avec la nouvelle quantité reçue / le nouveau prix.' : ''}</div>
+    <button class="psp-tab on" onclick="lvkEnregistrer(${l.id}, ${recu})">Enregistrer</button></div>`;
+}
+async function lvkEnregistrer(id, recu){
+  const v = k => { const x = document.getElementById('lvke-' + k); return x ? x.value.trim() : undefined; };
+  const n = k => { const x = v(k); return x === '' || x === undefined ? null : Number(x); };
+  const corps = {no_bon: v('no_bon'), no_kontre_plen: v('no_kontre_plen'), kantite_voye: n('kantite_voye'), pri_galon: n('pri_galon'),
+                 konpayi: v('konpayi'), chofe: v('chofe'), telefon_chofe: v('telefon_chofe'), plak_kamyon: v('plak_kamyon'), komante: v('komante')};
+  if(recu) corps.kantite_resevwa = n('kantite_resevwa');
+  try{ await PUT('/livrezon-admin/livrezon/' + id, corps); notify('Livraison modifiée.', 'ok'); lvkDetail(id); }
+  catch(e){ notify(e.message, 'err'); }
+}
+
+async function lvkKont(){
+  const K = (await GET('/livrezon-admin/kont')).kont;
+  document.getElementById('lvk-contenu').innerHTML = `
+    <div class="psp-card"><div class="psp-head"><b>Nouveau compte de réception</b><span class="psp-muted">code 4 chiffres + 4 lettres généré · PIN 6 chiffres</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+        <label class="lvk-f" style="flex:2;min-width:200px">Nom complet<input id="lvk-kn"></label>
+        <label class="lvk-f" style="flex:1;min-width:140px">PIN (vide = généré)<input id="lvk-kp" inputmode="numeric" maxlength="6"></label>
+        <button class="psp-tab on" onclick="lvkKontKreye()">Créer</button></div>
+      <div id="lvk-kres"></div></div>
+    <div class="psp-card"><div class="psp-head"><b>Comptes (${K.length})</b></div>
+      ${K.length ? `<table class="psp-tbl"><tr><th>Code</th><th>Nom</th><th class="r">Livraisons saisies</th><th>Statut</th><th></th></tr>
+      ${K.map(k => `<tr><td style="font-family:var(--mono);font-weight:700">${_lvkE(k.kod)}</td><td>${_lvkE(k.nom_complet)}</td><td class="r">${k.nb_livrezon}</td>
+        <td>${k.actif ? '<span style="color:var(--green2)">Actif</span>' : '<span class="psp-muted">Désactivé</span>'}</td>
+        <td style="white-space:nowrap"><button class="psp-tab" onclick="lvkKontPin(${k.id})">Nouveau PIN</button>
+          <button class="psp-tab" onclick="lvkKontActif(${k.id}, ${!k.actif})">${k.actif ? 'Désactiver' : 'Réactiver'}</button></td></tr>`).join('')}</table>`
+      : '<div class="psp-muted">Aucun compte : créez-en un pour la personne qui reçoit le carburant.</div>'}</div>`;
+}
+function _lvkMontrerCode(k){
+  document.getElementById('lvk-kres').innerHTML = `<div class="lvk-editbox" style="margin-top:10px">
+    <b>${_lvkE(k.nom_complet)}</b> — Code : <b style="font-family:var(--mono);font-size:18px">${_lvkE(k.kod)}</b> · PIN : <b style="font-family:var(--mono);font-size:18px">${_lvkE(k.pin)}</b>
+    <div class="psp-muted">Donnez ce code et ce PIN à la personne (le PIN ne sera plus affiché). Application : ${location.origin}/resepsyon</div></div>`;
+}
+async function lvkKontKreye(){
+  try{
+    const k = await POST('/livrezon-admin/kont', {nom_complet: document.getElementById('lvk-kn').value, pin: document.getElementById('lvk-kp').value || null});
+    await lvkKont(); _lvkMontrerCode(k);
+  }catch(e){ notify(e.message, 'err'); }
+}
+async function lvkKontPin(id){
+  try{ const k = await PUT('/livrezon-admin/kont/' + id, {nouvo_pin: true}); await lvkKont(); _lvkMontrerCode(k); }catch(e){ notify(e.message, 'err'); }
+}
+async function lvkKontActif(id, actif){
+  try{ await PUT('/livrezon-admin/kont/' + id, {actif}); lvkKont(); }catch(e){ notify(e.message, 'err'); }
+}
+
+async function lvkNotif(){
+  const N = (await GET('/livrezon-admin/notifikasyon')).notifikasyon;
+  document.getElementById('lvk-contenu').innerHTML = `<div class="psp-card"><div class="psp-head"><b>Journal des notifications</b>
+    <span class="psp-muted">SMS / WhatsApp (Twilio) et email ; 3 essais ; repli SMS si WhatsApp échoue</span></div>
+    ${N.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><tr><th>Quand</th><th>Livraison</th><th>Événement</th><th>Canal</th><th>Destinataire</th><th>Résultat</th><th>Erreur</th></tr>
+    ${N.map(n => `<tr><td>${_lvkDt(n.at)}</td><td>${_lvkE(n.numero)}</td><td>${n.evenman}</td><td>${n.kanal}</td><td>${_lvkE(n.destinate)}</td>
+      <td style="color:${n.statut === 'VOYE' ? 'var(--green2)' : n.statut === 'ECHWE' ? 'var(--red2)' : 'var(--muted)'}">${n.statut}${n.ranplasman ? ' → ' + n.ranplasman : ''}</td>
+      <td class="psp-muted">${_lvkE(n.ere || '')}</td></tr>`).join('')}</table></div>` : '<div class="psp-muted">Aucune notification.</div>'}</div>`;
+}
+
+function lvkApp(){
+  const url = location.origin + '/resepsyon';
+  document.getElementById('lvk-contenu').innerHTML = `<div class="psp-card"><div class="psp-head"><b>📲 Application « Konekta Resepsyon »</b></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+      <img src="/resepsyon/qr.png" alt="QR" style="width:180px;height:180px;background:#fff;border-radius:12px;padding:6px">
+      <div style="flex:1;min-width:240px">
+        <p>Pour la personne qui reçoit le carburant : elle choisit la station de livraison, saisit le bon, confirme la réception
+          (quantité reçue, jauges) — le stock de la station choisie est mis à jour et la fiche PDF est générée.</p>
+        <p>Lien de l’application : <a href="${url}" target="_blank">${url}</a><br>
+           Page d’installation (Android) : <a href="${url}/installer" target="_blank">${url}/installer</a><br>
+           APK Android : <a href="${url}/konekta-resepsyon.apk">${url}/konekta-resepsyon.apk</a></p>
+        <a class="psp-tab on" style="text-decoration:none;display:inline-block" target="_blank"
+           href="https://wa.me/?text=${encodeURIComponent('Konekta Resepsyon — enstale aplikasyon an : ' + url + '/installer')}">Envoyer par WhatsApp</a>
+      </div></div></div>`;
+}
 </script>
 </body>
 </html>

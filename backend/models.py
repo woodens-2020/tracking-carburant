@@ -2832,3 +2832,98 @@ class ConfigRapprochement(Base):
     volumes_max      = Column(JSON, nullable=True)
     modifie_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
     modifie_at       = Column(DateTime(timezone=True), nullable=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Livrezon kabiran (application « Konekta Resepsyon ») — base centrale
+# ══════════════════════════════════════════════════════════════════════════
+# Ces tables ne servent QUE dans l'espace principal (base centrale) : une
+# livraison y est enregistrée quelle que soit la station de destination
+# (station_id : 0 = principale, sinon espaces.id). À la réception, une
+# Livraison (stock) est créée dans le schéma de la station choisie.
+
+class LivrezonKabiran(Base):
+    __tablename__ = "livrezons_kabiran"
+
+    id              = Column(Integer, primary_key=True)
+    numero          = Column(String(20), unique=True, nullable=False)        # LVK-2026-00001
+    station_id      = Column(Integer, nullable=False, default=0)
+    station_nom     = Column(String(150), nullable=False)
+    produit_id      = Column(Integer, nullable=False)                        # id du produit DANS la station
+    produit_nom     = Column(String(100), nullable=False)
+    date_livrezon   = Column(DateTime(timezone=True), nullable=False)
+    no_kontre_plen  = Column(String(60), nullable=True)
+    no_bon          = Column(String(60), nullable=False)
+    no_bon_norm     = Column(String(60), nullable=False, unique=True)        # anti-doublon
+    kantite_voye    = Column(Numeric(14, 3), nullable=False)                 # gallons sur le bon
+    pri_galon       = Column(Numeric(12, 3), nullable=True)                  # prix d'achat (facultatif)
+    chofe           = Column(String(150), nullable=False)
+    telefon_chofe   = Column(String(20), nullable=False)                     # +509XXXXXXXX
+    plak_kamyon     = Column(String(30), nullable=False)
+    konpayi         = Column(String(150), nullable=False)
+    komante         = Column(String(1000), nullable=True)
+    statut          = Column(String(20), nullable=False, default="VALIDE")
+    # Revue admin
+    revize_par_id   = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    revize_at       = Column(DateTime(timezone=True), nullable=True)
+    motif           = Column(String(500), nullable=True)                     # rejet / annulation / clôture
+    # Réception à la station
+    kantite_resevwa = Column(Numeric(14, 3), nullable=True)
+    jog_avan        = Column(Numeric(14, 3), nullable=True)                  # jauge cuve avant (gal)
+    jog_apre        = Column(Numeric(14, 3), nullable=True)                  # jauge cuve après (gal)
+    ekat            = Column(Numeric(14, 3), nullable=True)                  # voye − resevwa
+    resevwa_par_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    resevwa_at      = Column(DateTime(timezone=True), nullable=True)
+    komante_resepsyon = Column(String(1000), nullable=True)
+    livraison_id    = Column(Integer, nullable=True)                         # Livraison créée dans la station
+    cree_par_id     = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at      = Column(DateTime(timezone=True), nullable=True)
+
+    cree_par    = relationship("Utilisateur", foreign_keys=[cree_par_id])
+    revize_par  = relationship("Utilisateur", foreign_keys=[revize_par_id])
+    resevwa_par = relationship("Utilisateur", foreign_keys=[resevwa_par_id])
+
+    __table_args__ = (
+        CheckConstraint("kantite_voye > 0", name="chk_lvk_kantite_pos"),
+        CheckConstraint("statut IN ('VALIDE','AN_WOUT','RESEVWA','FEMEN','EKAT','REJTE','ANILE')",
+                        name="chk_lvk_statut"),
+        Index("idx_lvk_station_date", "station_id", "date_livrezon"),
+        Index("idx_lvk_statut", "statut"),
+    )
+
+
+class LivrezonKabiranJounal(Base):
+    """Journal d'audit : une ligne par changement (qui, quand, quoi)."""
+    __tablename__ = "livrezons_kabiran_jounal"
+
+    id            = Column(Integer, primary_key=True)
+    livrezon_id   = Column(Integer, ForeignKey("livrezons_kabiran.id", ondelete="CASCADE"), nullable=False)
+    aksyon        = Column(String(40), nullable=False)
+    ansyen_statut = Column(String(20), nullable=True)
+    nouvo_statut  = Column(String(20), nullable=True)
+    detay         = Column(JSON, nullable=True)
+    itilizate_id  = Column(Integer, ForeignKey("utilisateurs.id", ondelete="SET NULL"), nullable=True)
+    itilizate_non = Column(String(150), nullable=True)
+    ip            = Column(String(45), nullable=True)
+    created_at    = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (Index("idx_lvk_jounal_livrezon", "livrezon_id"),)
+
+
+class LivrezonKabiranNotifikasyon(Base):
+    """Journal des notifications envoyées (SMS / WhatsApp / Email)."""
+    __tablename__ = "livrezons_kabiran_notifikasyon"
+
+    id          = Column(Integer, primary_key=True)
+    livrezon_id = Column(Integer, ForeignKey("livrezons_kabiran.id", ondelete="CASCADE"), nullable=False)
+    evenman     = Column(String(30), nullable=False)
+    kanal       = Column(String(12), nullable=False)          # SMS | WHATSAPP | EMAIL
+    destinate   = Column(String(254), nullable=False)
+    statut      = Column(String(15), nullable=False)          # VOYE | ECHWE | PA_KONFIGIRE
+    eseye       = Column(Integer, nullable=False, default=0)
+    ere         = Column(String(300), nullable=True)
+    ranplasman  = Column(String(12), nullable=True)           # canal de repli utilisé
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (Index("idx_lvk_notif_livrezon", "livrezon_id"),)

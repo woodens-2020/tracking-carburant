@@ -49,6 +49,7 @@ from taches_routes import router as taches_router
 from pieces_jointes_routes import router as pieces_jointes_router
 from listes_reference_routes import router as listes_reference_router
 from pompiste_routes import router as pompiste_router, assurer_role_pompiste, est_role_pompiste
+from livrezon_kabiran import router as livrezon_router, est_role_resepsyon
 from caisse_principale_routes import router as caisse_principale_router
 from auth import (
     SESSION_COOKIE, hash_password, verify_password,
@@ -208,9 +209,12 @@ _PUBLIC_PATHS    = {"/login", "/api/login", "/api/otp/verify", "/api/otp/request
                     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/reset-password/verify",
                     "/api/oauth/otp/send", "/api/config/branding", "/api/login/pompiste", "/api/pompiste/identifier", "/pompiste",
                     "/pompiste/manifest.webmanifest", "/pompiste-sw.js", "/pompiste/installer", "/pompiste/qr.png",
-                    "/pompiste/konekta-ponpis.apk", "/.well-known/assetlinks.json"}
-_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/") if _DEBUG_MODE
-                    else ("/api/auth/oauth/", "/shared/", "/pompiste-app/"))
+                    "/pompiste/konekta-ponpis.apk", "/.well-known/assetlinks.json",
+                    "/resepsyon", "/api/login/resepsyon", "/api/resepsyon/identifier",
+                    "/resepsyon/manifest.webmanifest", "/resepsyon-sw.js", "/resepsyon/installer",
+                    "/resepsyon/qr.png", "/resepsyon/konekta-resepsyon.apk"}
+_PUBLIC_PREFIXES = (("/docs", "/redoc", "/openapi.json", "/api/auth/oauth/", "/shared/", "/pompiste-app/", "/resepsyon-app/") if _DEBUG_MODE
+                    else ("/api/auth/oauth/", "/shared/", "/pompiste-app/", "/resepsyon-app/"))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -245,17 +249,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return JSONResponse({"detail": "Espace réservé : saisie des compteurs uniquement"},
                                     status_code=403)
             return RedirectResponse(url="/pompiste")
+        # Compte de réception du carburant : uniquement l'application /resepsyon.
+        if proxy.est_resepsyon and not (path in _RESEPSYON_PATHS or path.startswith("/api/resepsyon/")):
+            if path.startswith("/api/"):
+                return JSONResponse({"detail": "Espace réservé : réception du carburant uniquement"},
+                                    status_code=403)
+            return RedirectResponse(url="/resepsyon")
         return await call_next(request)
 
 
 # Seuls chemins ouverts à un compte pompiste (en plus de /api/pompiste/…)
 _POMPISTE_PATHS = {"/pompiste", "/api/logout", "/api/auth/me", "/api/auth/login-meta"}
+_RESEPSYON_PATHS = {"/resepsyon", "/api/logout", "/api/auth/me"}
 
 
 class _UserProxy:
     """Attributs scalaires de l'utilisateur, copiés avant la fermeture de session."""
     __slots__ = ("id","role","role_id","actif","nom_complet","username","poste","email","api_key_hash",
-                 "est_pompiste")
+                 "est_pompiste","est_resepsyon")
 
 
 def _admin_proprietaire_dans_espace(db):
@@ -292,9 +303,10 @@ def _resoudre_utilisateur(token, api_key_hdr):
         if not user:
             return None
         proxy = _UserProxy()
-        for attr in _UserProxy.__slots__[:-1]:
+        for attr in _UserProxy.__slots__[:-2]:
             setattr(proxy, attr, getattr(user, attr))
         proxy.est_pompiste = est_role_pompiste(user.role_obj)
+        proxy.est_resepsyon = est_role_resepsyon(user.role_obj)
         return proxy
 
 
@@ -336,6 +348,8 @@ class EspaceMiddleware:
             jeton = (parse_qs((scope.get("query_string") or b"").decode("latin-1")).get("token") or [None])[0]
             schema = await run_in_threadpool(espace_du_jeton_reset, jeton)
             poser = True
+        if scope.get("method") == "POST" and scope.get("path") == "/api/login/resepsyon":
+            schema, poser = None, True          # comptes de réception : base centrale uniquement
         if scope.get("method") == "POST" and scope.get("path") in self._CONNEXIONS:
             corps, plus = b"", True
             while plus:
@@ -409,6 +423,7 @@ app.include_router(taches_router)
 app.include_router(pieces_jointes_router)
 app.include_router(listes_reference_router)
 app.include_router(pompiste_router)
+app.include_router(livrezon_router)
 from placement_metres import router as placement_router
 app.include_router(placement_router)
 from classement_pompistes import router as classement_router
@@ -2128,9 +2143,11 @@ _APK_EMPREINTES = ["6B:F8:E0:4A:B6:7A:4A:D6:67:63:DA:F7:CB:48:65:BB:B6:48:FD:1D:
 
 @app.get("/.well-known/assetlinks.json", include_in_schema=False)
 def assetlinks():
+    # Deux applications signées avec la même clé : Ponpis et Resepsyon
     return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
-                          "target": {"namespace": "android_app", "package_name": _APK_PAQUET,
-                                     "sha256_cert_fingerprints": _APK_EMPREINTES}}],
+                          "target": {"namespace": "android_app", "package_name": paquet,
+                                     "sha256_cert_fingerprints": _APK_EMPREINTES}}
+                         for paquet in (_APK_PAQUET, "com.konekta.resepsyon", "com.konekta.resepsyon.staging")],
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
@@ -2153,6 +2170,71 @@ def pompiste_qr(request: Request):
 
 
 app.mount("/pompiste-app", StaticFiles(directory=_POMPISTE_APP_DIR), name="pompiste-app")
+
+
+# ---------- Application « Konekta Resepsyon » (réception du carburant) ----------
+_RESEPSYON_APP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "resepsyon-app")
+_RESEPSYON_APK_PAQUET = "com.konekta.resepsyon"
+
+
+@app.get("/resepsyon", include_in_schema=False)
+def serve_resepsyon():
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "resepsyon.html")
+    return FileResponse(html_path, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/resepsyon/manifest.webmanifest", include_in_schema=False)
+def resepsyon_manifest(request: Request):
+    nom = os.getenv("BRANDING_NOM", "").strip()
+    return JSONResponse({
+        "id": "/resepsyon",
+        "name": "Konekta Resepsyon" + (f" · {nom}" if nom else ""),
+        "short_name": "Resepsyon",
+        "description": "Livrezon kabiran : anrejistre, resevwa, mete stock estasyon yo ajou.",
+        "lang": "ht", "start_url": "/resepsyon", "scope": "/resepsyon",
+        "display": "standalone", "orientation": "portrait",
+        "background_color": "#eef2f7", "theme_color": "#0f766e",
+        "icons": [
+            {"src": "/resepsyon-app/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/resepsyon-app/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/resepsyon-app/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+    }, media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/resepsyon-sw.js", include_in_schema=False)
+def resepsyon_service_worker():
+    return FileResponse(os.path.join(_RESEPSYON_APP_DIR, "sw.js"), media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/resepsyon/installer", include_in_schema=False)
+def resepsyon_installer():
+    return FileResponse(os.path.join(_RESEPSYON_APP_DIR, "installer.html"), media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/resepsyon/konekta-resepsyon.apk", include_in_schema=False)
+def resepsyon_apk():
+    p = os.path.join(_RESEPSYON_APP_DIR, "konekta-resepsyon.apk")
+    if not os.path.exists(p):
+        raise HTTPException(404, "APK la poko disponib")
+    return FileResponse(p, media_type="application/vnd.android.package-archive",
+                        filename="konekta-resepsyon.apk", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/resepsyon/qr.png", include_in_schema=False)
+def resepsyon_qr(request: Request):
+    import io
+    import qrcode
+    img = qrcode.make(_url_publique_site(request) + "/resepsyon/installer", box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+app.mount("/resepsyon-app", StaticFiles(directory=_RESEPSYON_APP_DIR), name="resepsyon-app")
 
 
 @app.get("/login", include_in_schema=False)
