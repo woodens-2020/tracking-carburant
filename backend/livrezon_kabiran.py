@@ -320,7 +320,7 @@ class LivrezonIn(BaseModel):
     pri_galon: Optional[float] = None
     chofe: str
     telefon_chofe: str
-    plak_kamyon: str
+    plak_kamyon: Optional[str] = None          # opsyonèl
     konpayi: str
     komante: Optional[str] = None
 
@@ -384,7 +384,7 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
         erreurs.append({"chan": chan, "message": msg})
 
     for chan, label in (("no_bon", "No bon livrezon"), ("chofe", "Chofè"), ("telefon_chofe", "Telefòn chofè"),
-                        ("plak_kamyon", "Plak kamyon"), ("konpayi", "Konpayi")):
+                        ("konpayi", "Konpayi")):
         v = (data.get(chan) or "").strip()
         if not v:
             err(chan, f"{label} obligatwa.")
@@ -422,8 +422,8 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
         err("no_kontre_plen", "Kontre plen obligatwa.")
     if data.get("komante") is not None:
         data["komante"] = data["komante"].strip()[:1000] or None
-    if data.get("plak_kamyon"):
-        data["plak_kamyon"] = data["plak_kamyon"].upper()
+    if "plak_kamyon" in data:                     # opsyonèl : vide = ""
+        data["plak_kamyon"] = (data["plak_kamyon"] or "").strip().upper()
     # Station et produit (le produit doit appartenir à la station choisie)
     if "station_id" in data:
         try:
@@ -457,7 +457,7 @@ def _ecrire_stock(l: LivrezonKabiran) -> int:
             d = ra.astimezone(HAITI_TZ).date()
         lv = Livraison(produit_id=l.produit_id, date_livraison=d, gallons_recus=l.kantite_resevwa,
                        prix_achat_gallon=prix, fournisseur=l.konpayi[:150],
-                       reference_camion=f"{l.plak_kamyon} · Bon {l.no_bon}"[:100],
+                       reference_camion=" · ".join(x for x in (l.plak_kamyon, f"Bon {l.no_bon}") if x)[:100],
                        notes=f"{l.numero} — app Resepsyon. Voye {float(l.kantite_voye):g} gal, "
                              f"resevwa {float(l.kantite_resevwa):g} gal. Chofè {l.chofe}."[:500])
         sdb.add(lv)
@@ -475,7 +475,7 @@ def _modifier_stock(l: LivrezonKabiran) -> None:
             if l.pri_galon is not None:
                 lv.prix_achat_gallon = l.pri_galon
             lv.fournisseur = l.konpayi[:150]
-            lv.reference_camion = f"{l.plak_kamyon} · Bon {l.no_bon}"[:100]
+            lv.reference_camion = " · ".join(x for x in (l.plak_kamyon, f"Bon {l.no_bon}") if x)[:100]
             sdb.commit()
 
 
@@ -517,7 +517,7 @@ def _telefon_destinate(db: Session, l: LivrezonKabiran) -> list[tuple[str, str]]
 
 def _message(l: LivrezonKabiran, evenman: str) -> str:
     base = (f"Konekta — Livrezon {l.numero} ({l.station_nom}) : {l.produit_nom} "
-            f"{float(l.kantite_voye):g} gal, kamyon {l.plak_kamyon}, chofè {l.chofe}.")
+            f"{float(l.kantite_voye):g} gal, {'kamyon ' + l.plak_kamyon + ', ' if l.plak_kamyon else ''}chofè {l.chofe}.")
     return base + {
         "KREYE": " Livrezon anrejistre.",
         "APWOUVE": " Livrezon apwouve : an wout.",

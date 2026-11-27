@@ -117,10 +117,10 @@ def test_circuit_livrezon(client):
     assert {"fotos", "kantite_resevwa", "chofe"} <= {e["chan"] for e in r.json()["detail"]["erreurs"]}
     assert rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=["data:text/html;base64,PGI+"] * 2)).status_code == 422
     d_avan, _ = _stock(sch, "Diesel")
-    r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=[png, png]))
+    r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=[png, png], plak_kamyon=None))   # plak opsyonèl
     assert r.status_code == 201, r.text
     kp = r.json()
-    assert kp["statut"] == "FEMEN" and kp["kantite_resevwa"] == 2995 and kp["livraison_id"] and len(kp["fotos"]) == 2
+    assert kp["plak_kamyon"] == "" and kp["statut"] == "FEMEN" and kp["kantite_resevwa"] == 2995 and kp["livraison_id"] and len(kp["fotos"]) == 2
     assert [j["aksyon"] for j in kp["jounal"]] == ["KREYE", "RESEVWA", "FEMEN"]
     assert round(_stock(sch, "Diesel")[0] - d_avan, 3) == 2995
     f = rc.get(f"/api/resepsyon/livrezon/{kp['id']}/foto/{kp['fotos'][0]['id']}")

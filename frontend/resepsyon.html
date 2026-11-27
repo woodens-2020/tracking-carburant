@@ -248,7 +248,7 @@ function item(l){
     <div class="av">${ic}</div>
     <div class="tx"><div class="l1"><span>${esc(l.produit_nom)} · ${gal(l.kantite_resevwa ?? l.kantite_voye)}</span>${badge(l.statut)}</div>
     <div class="l2">📍 ${esc(l.station_nom)} · ${dt(l.resevwa_at || l.date_livrezon)}</div>
-    <div class="l2">🚛 ${esc(l.plak_kamyon)} · ${esc(l.konpayi)}</div></div></button>`;
+    <div class="l2">🚛 ${l.plak_kamyon ? esc(l.plak_kamyon) + ' · ' : ''}${esc(l.konpayi)}</div></div></button>`;
 }
 
 /* ── Formulaire de livraison ───────────────────────────── */
@@ -324,7 +324,7 @@ function dessinerForm(erreurs){
         <div class="hint">8 chif, san +509.</div>
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
           value="${esc(form.telefon_chofe ?? '')}" oninput="form.telefon_chofe=this.value;nettoyer('telefon_chofe')"></div><div class="ferr"></div></div>
-      ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an.', 'autocapitalize="characters" placeholder="egz: AB-12345"')}
+      ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an, si ou ka wè l.', 'autocapitalize="characters" placeholder="egz: AB-12345"', true)}
     </div>
     <div class="card">
       <div class="sec-t"><span class="n">4</span>Resepsyon</div>
@@ -396,7 +396,7 @@ function verifierLocal(){
   const e = [];
   if(form.station_id == null) e.push({chan: 'station_id', message: 'Chwazi estasyon an.'});
   if(form.station_id != null && form.produit_id == null) e.push({chan: 'produit_id', message: 'Chwazi tip kabiran an.'});
-  for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè'], ['plak_kamyon', 'Plak kamyon']])
+  for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè']])
     if(!String(form[c] || '').trim()) e.push({chan: c, message: l + ' obligatwa.'});
   const q = Number(form.kantite_voye);
   if(!(q > 0)) e.push({chan: 'kantite_voye', message: 'Kantite a dwe plis pase 0.'});
@@ -420,7 +420,7 @@ async function envoyer(){
   const corps = {station_id: form.station_id, produit_id: form.produit_id,
     no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: voye,
     chofe: form.chofe, telefon_chofe: '+509' + String(form.telefon_chofe).replace(/\D/g, ''),
-    plak_kamyon: form.plak_kamyon, konpayi: form.konpayi, komante: form.komante || null,
+    plak_kamyon: form.plak_kamyon || null, konpayi: form.konpayi, komante: form.komante || null,
     kantite_resevwa: q, jog_avan: num(form.jog_avan), jog_apre: num(form.jog_apre), fotos: fotos.filter(Boolean)};
   try{
     const l = await api('POST', '/api/resepsyon/livrezon/konple', corps);
@@ -459,7 +459,7 @@ async function detail(id, msg){
         ${kv('Estasyon', esc(l.station_nom))}${kv('Dat & lè', dt(l.resevwa_at || l.date_livrezon))}
         ${kv('Kontre plen', esc(l.no_kontre_plen || '—'))}${kv('Konpayi', esc(l.konpayi))}${kv('No bon', esc(l.no_bon))}
         ${kv('Chofè', esc(l.chofe))}${kv('Telefòn', `<a href="tel:${esc(l.telefon_chofe)}" style="color:var(--pri)">${esc(l.telefon_chofe)}</a>`)}
-        ${kv('Plak', esc(l.plak_kamyon))}${l.komante ? kv('Kòmantè', esc(l.komante)) : ''}
+        ${kv('Plak', esc(l.plak_kamyon || '—'))}${l.komante ? kv('Kòmantè', esc(l.komante)) : ''}
         ${l.kantite_resevwa != null ? kv('Ekat', gal(l.ekat)) + kv('Resevwa pa', esc(l.resevwa_par || '—')) : ''}
       </dl>
     </div>

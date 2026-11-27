@@ -42348,7 +42348,7 @@ async function lvkDashboard(){
              datasets: prods.map((p, i) => ({label: p, data: arr.map(l => l.produit_nom === p ? l.kantite_resevwa : null),
                backgroundColor: pal[i % pal.length], borderRadius: 4}))},
       options: {maintainAspectRatio: false, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true, title: {display: true, text: 'gallons reçus'}}},
-        plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {afterLabel: ctx => { const l = arr[ctx.dataIndex]; return `${l.konpayi} · ${l.plak_kamyon}`; }}}}}});
+        plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {afterLabel: ctx => { const l = arr[ctx.dataIndex]; return [l.konpayi, l.plak_kamyon].filter(Boolean).join(' · '); }}}}}});
   }
   const st = Object.entries(d.statuts).filter(([, n]) => n > 0);
   LVK.charts.statut = new Chart(document.getElementById('lvk-ch-statut'), {type: 'doughnut',
@@ -42499,7 +42499,7 @@ async function lvkDetail(id){
       <div class="lvk-grid2"><table class="psp-tbl">
         ${kv('Produit', _lvkE(l.produit_nom))}${kv('Date & heure', _lvkDt(l.date_livrezon))}${kv('N° bon', _lvkE(l.no_bon))}
         ${kv('N° contre-plein', _lvkE(l.no_kontre_plen || '—'))}${kv('Quantité envoyée', _lvkG(l.kantite_voye))}
-        ${kv('Compagnie', _lvkE(l.konpayi))}${kv('Chauffeur', _lvkE(l.chofe) + ' · ' + _lvkE(l.telefon_chofe))}${kv('Camion', _lvkE(l.plak_kamyon))}
+        ${kv('Compagnie', _lvkE(l.konpayi))}${kv('Chauffeur', _lvkE(l.chofe) + ' · ' + _lvkE(l.telefon_chofe))}${kv('Camion', _lvkE(l.plak_kamyon || '—'))}
         ${kv('Commentaire', _lvkE(l.komante || '—'))}${kv('Saisie par', _lvkE(l.cree_par || '—') + ' · ' + _lvkDt(l.created_at))}
       </table><table class="psp-tbl">
         ${kv('Quantité reçue', _lvkG(l.kantite_resevwa))}${kv('Jauge avant / après', _lvkG(l.jog_avan) + ' / ' + _lvkG(l.jog_apre))}
