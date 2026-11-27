@@ -42499,7 +42499,6 @@ async function lvkDetail(id){
       <div class="lvk-grid2"><table class="psp-tbl">
         ${kv('Produit', _lvkE(l.produit_nom))}${kv('Date & heure', _lvkDt(l.date_livrezon))}${kv('N° bon', _lvkE(l.no_bon))}
         ${kv('N° contre-plein', _lvkE(l.no_kontre_plen || '—'))}${kv('Quantité envoyée', _lvkG(l.kantite_voye))}
-        ${kv('Prix / gallon', l.pri_galon == null ? '— (dernier prix d’achat de la station)' : l.pri_galon + ' G')}
         ${kv('Compagnie', _lvkE(l.konpayi))}${kv('Chauffeur', _lvkE(l.chofe) + ' · ' + _lvkE(l.telefon_chofe))}${kv('Camion', _lvkE(l.plak_kamyon))}
         ${kv('Commentaire', _lvkE(l.komante || '—'))}${kv('Saisie par', _lvkE(l.cree_par || '—') + ' · ' + _lvkDt(l.created_at))}
       </table><table class="psp-tbl">
@@ -42509,6 +42508,9 @@ async function lvkDetail(id){
         ${kv('Stock', l.livraison_id ? `Livraison #${l.livraison_id} dans le stock de ${_lvkE(l.station_nom)}` : '—')}
         ${kv('Revue', _lvkE(l.revize_par || '—') + ' · ' + _lvkDt(l.revize_at))}${kv('Motif', _lvkE(l.motif || '—'))}
       </table></div>
+      ${(l.fotos || []).length ? `<div style="margin-top:12px"><b>📷 Photos de la fiche</b><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        ${l.fotos.map(f => `<a href="/api/livrezon-admin/livrezon/${l.id}/foto/${f.id}" target="_blank" rel="noopener"><img loading="lazy" src="/api/livrezon-admin/livrezon/${l.id}/foto/${f.id}" alt="${_lvkE(f.nom)}" style="width:160px;height:210px;object-fit:cover;border-radius:10px;border:1px solid var(--border, #e2e8f0)"></a>`).join('')}</div></div>`
+        : (l.kantite_resevwa != null ? '<div class="psp-muted" style="margin-top:10px">Aucune photo de la fiche.</div>' : '')}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         ${l.statut === 'VALIDE' ? `<button class="psp-tab on" style="background:var(--green);border-color:var(--green)" onclick="lvkAction(${l.id},'apwouve')">✓ Approuver (en route)</button>` : ''}
         ${enKou ? `<button class="psp-tab" onclick="lvkAction(${l.id},'rejte',true)">✕ Rejeter</button>` : ''}

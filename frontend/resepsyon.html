@@ -93,6 +93,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box
 .seg{display:flex;background:#e6ebf1;border-radius:14px;padding:4px;margin-bottom:12px}
 .seg button{flex:1;border:0;background:transparent;border-radius:11px;padding:10px 8px;font-weight:700;font-size:14px;color:#475569}
 .seg button.on{background:#fff;color:var(--pri);box-shadow:0 1px 4px rgba(15,23,42,.12)}
+.fotos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fslot{position:relative;aspect-ratio:3/4;border:2px dashed #b9c6d3;border-radius:16px;background:#f8fafc;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;color:var(--pri2);font-weight:800;font-size:14px;text-align:center;padding:10px;overflow:hidden;cursor:pointer}
+.fslot .ic{font-size:34px} .fslot small{font-weight:600;color:var(--mut);font-size:12px}
+.fslot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fslot.ok{border:2px solid var(--pri)} .fslot .re{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(15,23,42,.72);color:#fff;border-radius:10px;padding:7px;font-size:13px}
+.fslot .num{position:absolute;top:8px;left:8px;background:var(--pri);color:#fff;border-radius:999px;padding:3px 9px;font-size:12px;z-index:1}
+.f-err .fslot:not(.ok){border-color:var(--err);background:var(--errbg)}
+.vignettes{display:grid;grid-template-columns:1fr 1fr;gap:10px} .vignettes a{display:block;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#e9eef3}
+.vignettes img{width:100%;height:100%;object-fit:cover;display:block}
 .vide{text-align:center;padding:30px 18px;color:var(--mut)} .vide .e{font-size:40px;margin-bottom:6px}
 /* Connexion */
 .login{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center}
@@ -132,7 +142,7 @@ const ST = {VALIDE:'Valide', AN_WOUT:'An wout', RESEVWA:'Resevwa', FEMEN:'Fèmen
 const badge = s => `<span class="badge s-${s}">${ST[s] || s}</span>`;
 const COUL = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
 const charge = `<div class="vide"><span class="spin d"></span></div>`;
-let moi = null, stations = [], pile = [], form = {}, onglet = 'tann';
+let moi = null, stations = [], pile = [], form = {}, fotos = [null, null];
 
 async function api(method, path, body){
   const r = await fetch(path, {method, credentials: 'same-origin', headers: body ? {'Content-Type': 'application/json'} : {},
@@ -216,23 +226,20 @@ async function accueil(){
   let L = [];
   try{ L = (await api('GET', '/api/resepsyon/livrezon')).livrezons; }
   catch(e){ if(e.status === 401) return ecranCode(); return ecran('Livrezon kabiran', `<div class="alert err">${esc(e.message)}</div>`); }
-  const enKou = l => l.statut === 'VALIDE' || l.statut === 'AN_WOUT';
-  const tann = L.filter(enKou), fini = L.filter(l => !enKou(l));
-  const liste = onglet === 'tann' ? tann : fini;
+  const jodi = new Date().toDateString();
+  const bon = L.filter(l => l.statut !== 'ANILE' && l.statut !== 'REJTE');
+  const nJodi = bon.filter(l => new Date(l.resevwa_at || l.date_livrezon).toDateString() === jodi).length;
   ecran('Livrezon kabiran', `
     <div class="hero">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
         <div><div class="hi">Konekte kòm</div><div class="nm">${esc(moi.nom_complet)}</div><div class="hi">${esc(moi.username)}</div></div>
         <button onclick="accueil()" aria-label="Rafrechi" style="border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:12px;width:42px;height:42px;font-size:18px">↻</button>
       </div>
-      <div class="stats"><div><b>${tann.length}</b><span>k ap tann</span></div><div><b>${fini.filter(l => l.statut !== 'ANILE' && l.statut !== 'REJTE').length}</b><span>resevwa</span></div></div>
+      <div class="stats"><div><b>${nJodi}</b><span>kamyon jodi a</span></div><div><b>${bon.length}</b><span>kamyon resevwa</span></div></div>
     </div>
-    <div class="seg">
-      <button class="${onglet === 'tann' ? 'on' : ''}" onclick="onglet='tann';accueil()">🚚 K ap tann</button>
-      <button class="${onglet === 'fini' ? 'on' : ''}" onclick="onglet='fini';accueil()">✅ Resevwa</button>
-    </div>
-    ${liste.length ? liste.map(item).join('') : `<div class="card vide"><div class="e">${onglet === 'tann' ? '🚛' : '📭'}</div>${onglet === 'tann'
-      ? 'Pa gen livrezon k ap tann.<br>Peze « Nouvo livrezon » lè kamyon an rive.' : 'Poko gen livrezon resevwa.'}</div>`}
+    <div class="sec-t" style="margin:4px 2px 10px">✅ Gaz resevwa</div>
+    ${L.length ? L.map(item).join('') : `<div class="card vide"><div class="e">🚛</div>Poko gen livrezon resevwa.<br>Peze « Nouvo livrezon » lè yon kamyon gaz rive.</div>`}
+    <div style="height:70px"></div>
     <button class="btn fab" onclick="aller(nouveau)">＋ Nouvo livrezon</button>`);
 }
 function item(l){
@@ -249,7 +256,7 @@ async function nouveau(){
   ecran('Nouvo livrezon', charge, true);
   try{ stations = (await api('GET', '/api/resepsyon/stations')).stations; }
   catch(e){ return ecran('Nouvo livrezon', `<div class="alert err">${esc(e.message)}</div>`, true); }
-  form = {station_id: stations.length === 1 ? stations[0].id : null};
+  form = {station_id: stations.length === 1 ? stations[0].id : null}; fotos = [null, null];
   dessinerForm();
 }
 /* Chan : tit → endikasyon → kaz (youn anba lòt) */
@@ -308,7 +315,6 @@ function dessinerForm(erreurs){
       ${champ('no_bon', 'Nimewo bon livrezon', 'Nimewo ki sou bon konpayi a bay la.', 'autocapitalize="characters" placeholder="egz: BL-77881"')}
       ${champ('kantite_voye', 'Kantite voye', 'Kantite galon ki ekri sou bon livrezon an.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3000"', false, 'galon')}
       ${champ('konpayi', 'Konpayi', 'Konpayi ki voye gaz la.', 'placeholder="egz: Sol, Total, Dinasa…"')}
-      ${champ('pri_galon', 'Pri pa galon', 'Pri achte a, si ou konnen l.', 'type="number" inputmode="decimal" step="0.01" min="0" placeholder="egz: 610"', true, 'goud')}
       <div class="info">🕒<div><b>Dat & lè : otomatik</b>Sistèm nan anrejistre lè ou peze « Anrejistre ».</div></div>
     </div>
     <div class="card">
@@ -319,14 +325,67 @@ function dessinerForm(erreurs){
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
           value="${esc(form.telefon_chofe ?? '')}" oninput="form.telefon_chofe=this.value;nettoyer('telefon_chofe')"></div><div class="ferr"></div></div>
       ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an.', 'autocapitalize="characters" placeholder="egz: AB-12345"')}
+    </div>
+    <div class="card">
+      <div class="sec-t"><span class="n">4</span>Resepsyon</div>
+      ${champ('kantite_resevwa', 'Kantite resevwa', 'Kantite galon ki antre vre nan tank lan lè kamyon an fin vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 2998" style="font-size:20px;font-weight:800"', false, 'galon')}
+      ${champ('jog_avan', 'Jòj tank lan avan', 'Kantite ki te nan tank lan anvan kamyon an vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 800" onchange="calcJogF()"', true, 'galon')}
+      ${champ('jog_apre', 'Jòj tank lan apre', 'Kantite ki nan tank lan apre kamyon an fin vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3750" onchange="calcJogF()"', true, 'galon')}
+      <div id="jog-info" class="small muted" style="margin:-6px 0 12px"></div>
       <div class="fld" id="f-komante"><label for="i-komante">Kòmantè<span class="opt">opsyonèl</span></label>
-        <div class="hint">Nenpòt lòt bagay ou vle direksyon an konnen.</div>
+        <div class="hint">Si gen yon pwoblèm oswa yon diferans, ekri l la.</div>
         <textarea id="i-komante" rows="3" oninput="form.komante=this.value">${esc(form.komante ?? '')}</textarea></div>
+    </div>
+    <div class="card">
+      <div class="sec-t"><span class="n">5</span>Foto fèy livrezon an</div>
+      <div class="fld" id="f-fotos" style="margin-bottom:0"><label>2 foto fèy la<span class="req">*</span></label>
+        <div class="hint">Mete fèy la byen plat, nan bon limyè, epi pran tout fèy la nan foto a. Pran 2 foto (egz : devan ak dèyè, oswa 2 fèy yo).</div>
+        <div class="fotos">${[0, 1].map(slotFoto).join('')}</div>
+        <input id="cam" type="file" accept="image/*" capture="environment" class="hide" onchange="prendreFoto(this)">
+        <div class="ferr"></div></div>
     </div>
     <div class="barre-bas"><button class="btn" id="b-env" onclick="envoyer()">✓ Anrejistre livrezon an</button></div>`, true);
   ligneStock();
   (erreurs || []).forEach(e => marquer(e.chan, e.message));
   if(erreurs && erreurs.length){ const z = document.getElementById('f-' + erreurs[0].chan); if(z) z.scrollIntoView({block: 'center'}); }
+}
+function slotFoto(i){
+  const f = fotos[i];
+  return `<div class="fslot ${f ? 'ok' : ''}" id="slot-${i}" role="button" tabindex="0" onclick="ouvrirCam(${i})"><span class="num">Foto ${i + 1}</span>
+    ${f ? `<img src="${f}" alt="Foto ${i + 1} fèy la"><span class="re">🔄 Pran l ankò</span>`
+        : `<span class="ic">📷</span>Skane fèy la<small>Peze pou pran foto a</small>`}</div>`;
+}
+let slotCam = 0;
+function ouvrirCam(i){ slotCam = i; const c = $('#cam'); c.value = ''; c.click(); }
+/* Foto a redui (1600 px, JPEG) pou l voye vit menm sou rezo telefòn */
+function comprimer(file){
+  return new Promise((ok, ko) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', 0.78));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ko(new Error('Foto a pa ka li : pran l ankò.')); };
+    img.src = url;
+  });
+}
+async function prendreFoto(inp){
+  const file = inp.files && inp.files[0]; if(!file) return;
+  const i = slotCam, z = document.getElementById('slot-' + i);
+  z.innerHTML = '<span class="spin d"></span>';
+  try{ fotos[i] = await comprimer(file); }catch(e){ alert(e.message); }
+  z.outerHTML = slotFoto(i);
+  if(fotos.every(Boolean)) nettoyer('fotos');
+}
+function calcJogF(){
+  const a = form.jog_avan, p = form.jog_apre, z = $('#jog-info'); if(!z) return;
+  if(a && p){
+    if(Number(p) < Number(a)){ z.textContent = 'Jòj apre a dwe pi wo pase jòj avan an.'; z.style.color = 'var(--err)'; return; }
+    const d = Number(p) - Number(a);
+    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(d)}</b> · <a href="#" style="color:var(--pri);font-weight:700" onclick="form.kantite_resevwa='${d.toFixed(3)}';$('#i-kantite_resevwa').value='${d.toFixed(3)}';nettoyer('kantite_resevwa');return false">itilize l kòm kantite resevwa</a>`;
+  } else z.textContent = '';
 }
 function marquer(chan, msg){
   const z = document.getElementById('f-' + chan); if(!z) return;
@@ -343,21 +402,30 @@ function verifierLocal(){
   if(!(q > 0)) e.push({chan: 'kantite_voye', message: 'Kantite a dwe plis pase 0.'});
   const t = String(form.telefon_chofe || '').replace(/\D/g, '');
   if(!/^[0-9]{8}$/.test(t)) e.push({chan: 'telefon_chofe', message: '8 chif apre +509 (egz: 3456 7890).'});
+  if(!(Number(form.kantite_resevwa) > 0)) e.push({chan: 'kantite_resevwa', message: 'Kantite resevwa a dwe plis pase 0.'});
+  if(form.jog_avan && form.jog_apre && Number(form.jog_apre) < Number(form.jog_avan))
+    e.push({chan: 'jog_apre', message: 'Jòj apre a dwe pi wo pase jòj avan an.'});
+  const nf = fotos.filter(Boolean).length;
+  if(nf < 2) e.push({chan: 'fotos', message: nf ? 'Pran 2yèm foto fèy la.' : 'Pran 2 foto fèy livrezon an.'});
   return e;
 }
 async function envoyer(){
   const e = verifierLocal();
   if(e.length) return dessinerForm(e);
+  const voye = Number(form.kantite_voye), q = Number(form.kantite_resevwa), tol = moi.tolerans_galon ?? 5;
+  const tolL = Math.max(tol, voye * (moi.tolerans_pct ?? 0.5) / 100);
+  if(Math.abs(voye - q) > tolL && !confirm(`Voye ${gal(voye)}, resevwa ${gal(q)} : ekat ${gal(voye - q)}. Direksyon an ap resevwa yon alèt. Konfime?`)) return;
   const b = $('#b-env'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Ap anrejistre…';
+  const num = v => v === '' || v == null ? null : Number(v);
   const corps = {station_id: form.station_id, produit_id: form.produit_id,
-    no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: Number(form.kantite_voye),
-    pri_galon: form.pri_galon === '' || form.pri_galon == null ? null : Number(form.pri_galon),
+    no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: voye,
     chofe: form.chofe, telefon_chofe: '+509' + String(form.telefon_chofe).replace(/\D/g, ''),
-    plak_kamyon: form.plak_kamyon, konpayi: form.konpayi, komante: form.komante || null};
+    plak_kamyon: form.plak_kamyon, konpayi: form.konpayi, komante: form.komante || null,
+    kantite_resevwa: q, jog_avan: num(form.jog_avan), jog_apre: num(form.jog_apre), fotos: fotos.filter(Boolean)};
   try{
-    const l = await api('POST', '/api/resepsyon/livrezon', corps);
-    pile.pop(); onglet = 'tann';
-    aller(() => detail(l.id, 'Livrezon anrejistre. Lè kamyon an fin vide, konfime resepsyon an anba a.'));
+    const l = await api('POST', '/api/resepsyon/livrezon/konple', corps);
+    pile.pop(); fotos = [null, null];
+    aller(() => detail(l.id, 'Livrezon anrejistre — stock ' + l.station_nom + ' mete ajou. Ou ka pataje fèy la sou WhatsApp.'));
   }catch(err){
     if(err.erreurs) return dessinerForm(err.erreurs);
     b.disabled = false; b.textContent = '✓ Anrejistre livrezon an';
@@ -395,6 +463,8 @@ async function detail(id, msg){
         ${l.kantite_resevwa != null ? kv('Ekat', gal(l.ekat)) + kv('Resevwa pa', esc(l.resevwa_par || '—')) : ''}
       </dl>
     </div>
+    ${(l.fotos || []).length ? `<div class="card"><div class="sec-t" style="margin-bottom:10px">📷 Foto fèy la</div><div class="vignettes">
+      ${l.fotos.map(f => `<a href="/api/resepsyon/livrezon/${l.id}/foto/${f.id}" target="_blank" rel="noopener"><img loading="lazy" src="/api/resepsyon/livrezon/${l.id}/foto/${f.id}" alt="${esc(f.nom)}"></a>`).join('')}</div></div>` : ''}
     ${attend ? `<div class="card" id="rec">
       <div class="sec-t"><span class="n">🛢</span>Konfime resepsyon an</div>
       <div class="info" style="margin:0 0 6px">ℹ️<div>Fè sa lè kamyon an fin vide nan tank lan. Stock ${esc(l.produit_nom)} ${esc(l.station_nom)} ap monte otomatikman.</div></div>
@@ -459,7 +529,6 @@ async function recevoir(id, voye, tol){
   try{
     const l = await api('POST', `/api/resepsyon/livrezon/${id}/resevwa`,
       {kantite_resevwa: q, jog_avan: num($('#r-a').value), jog_apre: num($('#r-p').value), komante: $('#r-c').value || null});
-    onglet = 'fini';
     await detail(id, 'Resepsyon anrejistre — stock ' + l.station_nom + ' mete ajou. Fèy PDF la pare.');
     window.open(`/api/resepsyon/livrezon/${id}/pdf`, '_blank');
   }catch(e){ b.disabled = false; b.textContent = '✓ Konfime resepsyon'; alert(e.message); }

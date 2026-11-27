@@ -23,6 +23,7 @@ Préfixes :
 """
 from __future__ import annotations
 
+import base64
 import io
 import logging
 import os
@@ -43,7 +44,7 @@ from auth import hash_code_acces, hash_password, verify_code_acces
 from database import get_db, session_espace, session_principale
 from models import (
     Livraison, LivrezonKabiran, LivrezonKabiranJounal, LivrezonKabiranNotifikasyon,
-    Produit, Role, Utilisateur,
+    PieceJointe, Produit, Role, Utilisateur,
 )
 from tz_utils import HAITI_TZ, now_haiti, today_haiti
 
@@ -59,6 +60,8 @@ _TEL_RE = re.compile(r"^\+509[0-9]{8}$")
 _CODE_RE = re.compile(r"^[0-9]{4}[A-Z]{4}$")
 _PIN_RE = re.compile(r"^[0-9]{6}$")
 _LETTRES = "ABCDEFGHJKLMNPQRSTUVWXYZ"     # sans I ni O (confusion avec 1 et 0)
+TYPE_FOTO = "livrezon_kabiran"              # photos de la fiche (pieces_jointes, schéma principal)
+FOTO_MIN, FOTO_MAX, FOTO_OCTETS = 2, 4, 4 * 1024 * 1024
 MAX_GALON = 20000                          # garde-fou : un camion-citerne
 
 
@@ -243,6 +246,8 @@ def livrezon_dict(l: LivrezonKabiran, jounal: bool = False, db: Optional[Session
         "created_at": _iso(l.created_at), "updated_at": _iso(l.updated_at),
     }
     if jounal and db is not None:
+        d["fotos"] = [{"id": f.id, "nom": f.nom_fichier} for f in db.query(PieceJointe.id, PieceJointe.nom_fichier)
+                      .filter_by(type_entite=TYPE_FOTO, entite_id=l.id).order_by(PieceJointe.id).all()]
         d["jounal"] = [{"aksyon": j.aksyon, "ansyen_statut": j.ansyen_statut, "nouvo_statut": j.nouvo_statut,
                         "detay": j.detay, "itilizate": j.itilizate_non, "at": _iso(j.created_at)}
                        for j in db.query(LivrezonKabiranJounal).filter_by(livrezon_id=l.id)
@@ -341,6 +346,15 @@ class ResepsyonIn(BaseModel):
     jog_avan: Optional[float] = None
     jog_apre: Optional[float] = None
     komante: Optional[str] = None
+
+
+class LivrezonKonpleIn(LivrezonIn):
+    """L'application enregistre le camion arrivé en une fois : livraison + réception + 2 photos de la fiche."""
+    kantite_resevwa: Optional[float] = None
+    jog_avan: Optional[float] = None
+    jog_apre: Optional[float] = None
+    komante_resepsyon: Optional[str] = None
+    fotos: list[str] = []                    # data URL (image/jpeg, image/png, image/webp)
 
 
 class MotifIn(BaseModel):
@@ -667,7 +681,8 @@ def login(data: LoginIn, request: Request, response: Response):
 @router.get("/api/resepsyon/me")
 def me(u: Utilisateur = Depends(_require_resepsyon)):
     return {"id": u.id, "username": (u.username or "").upper(), "nom_complet": u.nom_complet,
-            "resepsyon": est_role_resepsyon(u.role_obj), "tolerans_galon": tolerans(0)}
+            "resepsyon": est_role_resepsyon(u.role_obj), "tolerans_galon": tolerans(0),
+            "tolerans_pct": round((tolerans(1e9) / 1e9) * 100, 4)}
 
 
 @router.get("/api/resepsyon/stations")
@@ -683,12 +698,7 @@ def stations(_u: Utilisateur = Depends(_require_resepsyon)):
     return {"stations": out}
 
 
-@router.post("/api/resepsyon/livrezon", status_code=201)
-def kreye(data: LivrezonIn, request: Request, u: Utilisateur = Depends(_require_resepsyon),
-          udb: Session = Depends(get_db)):
-    with session_principale() as db:
-        acteur = _Acteur(udb, u)
-        v = _verifier(db, data.model_dump(), kreye=True)
+def _nouvo(db: Session, v: dict, acteur) -> LivrezonKabiran:
         l = LivrezonKabiran(
             numero=_prochain_numero(db), station_id=v["station_id"], station_nom=v["station_nom"],
             produit_id=v["produit_id"], produit_nom=v["produit_nom"], date_livrezon=datetime.now(timezone.utc),  # dat & lè otomatik
@@ -703,6 +713,16 @@ def kreye(data: LivrezonIn, request: Request, u: Utilisateur = Depends(_require_
             db.rollback()
             raise HTTPException(422, {"code": "validasyon", "message": "Bon livrezon sa a deja anrejistre.",
                                       "erreurs": [{"chan": "no_bon", "message": "Bon livrezon sa a deja anrejistre."}]})
+        return l
+
+
+@router.post("/api/resepsyon/livrezon", status_code=201)
+def kreye(data: LivrezonIn, request: Request, u: Utilisateur = Depends(_require_resepsyon),
+          udb: Session = Depends(get_db)):
+    with session_principale() as db:
+        acteur = _Acteur(udb, u)
+        v = _verifier(db, data.model_dump(), kreye=True)
+        l = _nouvo(db, v, acteur)
         _jounal(db, l, "KREYE", None, acteur, request)
         db.commit()
         db.refresh(l)
@@ -747,9 +767,7 @@ def _fini_resepsyon(db: Session, l: LivrezonKabiran, acteur, request: Request) -
             {"ekat": float(l.ekat), "tolerans": tolerans(float(l.kantite_voye))})
 
 
-@router.post("/api/resepsyon/livrezon/{lid}/resevwa")
-def resevwa(lid: int, data: ResepsyonIn, request: Request, u: Utilisateur = Depends(_require_resepsyon),
-            udb: Session = Depends(get_db)):
+def _verifier_resepsyon(data: ResepsyonIn) -> None:
     if data.kantite_resevwa is None or data.kantite_resevwa <= 0:
         raise HTTPException(422, {"code": "validasyon", "message": "Kantite resevwa a dwe plis pase 0.",
                                   "erreurs": [{"chan": "kantite_resevwa", "message": "Kantite resevwa a dwe plis pase 0."}]})
@@ -759,7 +777,133 @@ def resevwa(lid: int, data: ResepsyonIn, request: Request, u: Utilisateur = Depe
         if v is not None and v < 0:
             raise HTTPException(422, {"code": "validasyon", "message": "Jòj tank lan pa ka negatif."})
     if data.jog_avan is not None and data.jog_apre is not None and data.jog_apre < data.jog_avan:
-        raise HTTPException(422, {"code": "validasyon", "message": "Jòj apre a dwe pi wo pase jòj avan an."})
+        raise HTTPException(422, {"code": "validasyon", "message": "Jòj apre a dwe pi wo pase jòj avan an.",
+                                  "erreurs": [{"chan": "jog_apre", "message": "Jòj apre a dwe pi wo pase jòj avan an."}]})
+
+
+def _appliquer_resepsyon(db: Session, l: LivrezonKabiran, data: ResepsyonIn, acteur, request: Request,
+                         fotos: Optional[list] = None) -> None:
+    """Réception : stock de la station, journal, écart, photos — un seul commit (stock retiré si échec)."""
+    ansyen = l.statut
+    l.kantite_resevwa, l.jog_avan, l.jog_apre = data.kantite_resevwa, data.jog_avan, data.jog_apre
+    l.komante_resepsyon = (data.komante or "").strip()[:1000] or None
+    l.resevwa_par_id, l.resevwa_at, l.statut = acteur.id, datetime.now(timezone.utc), "RESEVWA"
+    l.livraison_id = _ecrire_stock(l)             # stock de la station choisie
+    try:
+        _jounal(db, l, "RESEVWA", ansyen, acteur, request,
+                {"kantite_resevwa": data.kantite_resevwa, "jog_avan": data.jog_avan, "jog_apre": data.jog_apre,
+                 "livraison_id": l.livraison_id, **({"fotos": len(fotos)} if fotos else {})})
+        _fini_resepsyon(db, l, acteur, request)
+        for i, (mime, brut) in enumerate(fotos or [], 1):
+            ext = {"image/png": "png", "image/webp": "webp"}.get(mime, "jpg")
+            db.add(PieceJointe(type_entite=TYPE_FOTO, entite_id=l.id, nom_fichier=f"fich-{l.numero}-{i}.{ext}",
+                               type_mime=mime, taille_octets=len(brut), contenu_base64=base64.b64encode(brut).decode("ascii"),
+                               uploaded_par_id=acteur.id))
+        l.updated_at = datetime.now(timezone.utc)
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Ne pas laisser de stock orphelin dans la station
+        try:
+            with session_espace(_schema(l.station_id)) as sdb:
+                lv = sdb.get(Livraison, l.livraison_id)
+                if lv:
+                    sdb.delete(lv)
+                    sdb.commit()
+        except Exception:
+            log.exception("nettoyage livraison orpheline")
+        raise
+
+
+def _lire_fotos(fotos: list[str]) -> list[tuple[str, bytes]]:
+    msg = f"Pran {FOTO_MIN} foto fèy livrezon an (obligatwa)."
+    if len(fotos) < FOTO_MIN:
+        raise HTTPException(422, {"code": "validasyon", "message": msg, "erreurs": [{"chan": "fotos", "message": msg}]})
+    if len(fotos) > FOTO_MAX:
+        raise HTTPException(422, {"code": "validasyon", "message": f"{FOTO_MAX} foto maksimòm."})
+    out = []
+    for f in fotos:
+        m = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$", f or "")
+        try:
+            brut = base64.b64decode(m.group(2), validate=False) if m else b""
+        except Exception:
+            brut = b""
+        if not brut:
+            raise HTTPException(422, {"code": "validasyon", "message": "Foto a pa bon : pran l ankò.",
+                                      "erreurs": [{"chan": "fotos", "message": "Foto a pa bon : pran l ankò."}]})
+        if len(brut) > FOTO_OCTETS:
+            raise HTTPException(422, {"code": "validasyon", "message": "Foto a twò lou.",
+                                      "erreurs": [{"chan": "fotos", "message": "Foto a twò lou : pran l ankò."}]})
+        out.append((m.group(1), brut))
+    return out
+
+
+@router.post("/api/resepsyon/livrezon/konple", status_code=201)
+def kreye_konple(data: LivrezonKonpleIn, request: Request, u: Utilisateur = Depends(_require_resepsyon),
+                 udb: Session = Depends(get_db)):
+    """Camion arrivé : livraison + réception + photos de la fiche, en une fois (pas d'étape « k ap tann »)."""
+    rec = ResepsyonIn(kantite_resevwa=data.kantite_resevwa if data.kantite_resevwa is not None else 0,
+                      jog_avan=data.jog_avan, jog_apre=data.jog_apre, komante=data.komante_resepsyon)
+    with session_principale() as db:
+        acteur = _Acteur(udb, u)
+        corps = data.model_dump(exclude={"kantite_resevwa", "jog_avan", "jog_apre", "komante_resepsyon", "fotos"})
+        try:
+            v = _verifier(db, corps, kreye=True)
+            erreurs = []
+        except HTTPException as e:
+            if not isinstance(e.detail, dict):
+                raise
+            v, erreurs = None, list(e.detail.get("erreurs") or [])
+        # Toutes les erreurs en une fois (formulaire, réception, photos)
+        for fn in (lambda: _verifier_resepsyon(rec), lambda: _lire_fotos(data.fotos)):
+            try:
+                fn()
+            except HTTPException as e:
+                d = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
+                erreurs += d.get("erreurs") or [{"chan": "kantite_resevwa", "message": d.get("message")}]
+        if erreurs:
+            raise HTTPException(422, {"code": "validasyon", "message": f"{len(erreurs)} erè nan fòm nan.", "erreurs": erreurs})
+        fotos = _lire_fotos(data.fotos)
+        l = _nouvo(db, v, acteur)
+        _jounal(db, l, "KREYE", None, acteur, request)
+        db.commit()                                   # le stock s'écrit dans une autre session (schéma de la station)
+        try:
+            _appliquer_resepsyon(db, l, rec, acteur, request, fotos)
+        except Exception:
+            # Rien à moitié : la livraison créée est retirée si la réception échoue
+            db.query(LivrezonKabiranJounal).filter_by(livrezon_id=l.id).delete()
+            db.query(LivrezonKabiran).filter_by(id=l.id).delete()
+            db.commit()
+            raise
+        db.refresh(l)
+        notifier(db, l, "EKAT" if l.statut == "EKAT" else "RESEVWA")
+        return livrezon_dict(l, jounal=True, db=db)
+
+
+def _foto(lid: int, fid: int) -> Response:
+    with session_principale() as db:
+        f = db.query(PieceJointe).filter_by(id=fid, type_entite=TYPE_FOTO, entite_id=lid).first()
+        if not f:
+            raise HTTPException(404, "Foto sa a pa egziste")
+        return Response(base64.b64decode(f.contenu_base64), media_type=f.type_mime,
+                        headers={"Content-Disposition": f'inline; filename="{f.nom_fichier}"',
+                                 "Cache-Control": "private, max-age=86400"})
+
+
+@router.get("/api/resepsyon/livrezon/{lid}/foto/{fid}")
+def foto_resepsyon(lid: int, fid: int, _u: Utilisateur = Depends(_require_resepsyon)):
+    return _foto(lid, fid)
+
+
+@router.get("/api/livrezon-admin/livrezon/{lid}/foto/{fid}")
+def foto_admin(lid: int, fid: int, _u: Utilisateur = Depends(_require_superviseur)):
+    return _foto(lid, fid)
+
+
+@router.post("/api/resepsyon/livrezon/{lid}/resevwa")
+def resevwa(lid: int, data: ResepsyonIn, request: Request, u: Utilisateur = Depends(_require_resepsyon),
+            udb: Session = Depends(get_db)):
+    _verifier_resepsyon(data)
     with session_principale() as db:
         acteur = _Acteur(udb, u)
         l = db.query(LivrezonKabiran).filter_by(id=lid).with_for_update().first() if db.bind.dialect.name == "postgresql" \
@@ -768,30 +912,7 @@ def resevwa(lid: int, data: ResepsyonIn, request: Request, u: Utilisateur = Depe
             raise HTTPException(404, "Livrezon sa a pa egziste")
         if l.statut not in EN_KOU:
             raise HTTPException(409, f"Livrezon sa a deja {STATUT_KREYOL.get(l.statut, l.statut).lower()}.")
-        ansyen = l.statut
-        l.kantite_resevwa, l.jog_avan, l.jog_apre = data.kantite_resevwa, data.jog_avan, data.jog_apre
-        l.komante_resepsyon = (data.komante or "").strip()[:1000] or None
-        l.resevwa_par_id, l.resevwa_at, l.statut = acteur.id, datetime.now(timezone.utc), "RESEVWA"
-        l.livraison_id = _ecrire_stock(l)             # stock de la station choisie
-        try:
-            _jounal(db, l, "RESEVWA", ansyen, acteur, request,
-                    {"kantite_resevwa": data.kantite_resevwa, "jog_avan": data.jog_avan, "jog_apre": data.jog_apre,
-                     "livraison_id": l.livraison_id})
-            _fini_resepsyon(db, l, acteur, request)
-            l.updated_at = datetime.now(timezone.utc)
-            db.commit()
-        except Exception:
-            db.rollback()
-            # Ne pas laisser de stock orphelin dans la station
-            try:
-                with session_espace(_schema(l.station_id)) as sdb:
-                    lv = sdb.get(Livraison, l.livraison_id)
-                    if lv:
-                        sdb.delete(lv)
-                        sdb.commit()
-            except Exception:
-                log.exception("nettoyage livraison orpheline")
-            raise
+        _appliquer_resepsyon(db, l, data, acteur, request)
         db.refresh(l)
         notifier(db, l, "EKAT" if l.statut == "EKAT" else "RESEVWA")
         return livrezon_dict(l, jounal=True, db=db)

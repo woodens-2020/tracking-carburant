@@ -4,7 +4,7 @@
    serveur en direct, rien n'est servi depuis un cache périmé. Le cache ne
    sert qu'à afficher l'écran et un message clair quand il n'y a pas
    d'internet. Les appels /api/ ne passent jamais par le cache. */
-const VERSION = 'resepsyon-v2';
+const VERSION = 'resepsyon-v3';
 const COQUILLE = ['/resepsyon', '/resepsyon-app/icone-192.png', '/resepsyon-app/icone-512.png'];
 
 self.addEventListener('install', e => {

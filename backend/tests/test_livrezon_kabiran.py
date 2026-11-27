@@ -108,6 +108,28 @@ def test_circuit_livrezon(client):
     ma2 = next(s for s in rc.get("/api/resepsyon/stations").json()["stations"] if s["id"] == eid)
     assert ma2["produits"][0]["stock"] == round(gaz["stock"] + 3000, 3)
     assert p.post(f"/api/livrezon-admin/livrezon/{r.json()['id']}/anile", json={"motif": "Test type"}).status_code == 200
+    # Application : camion arrivé enregistré en une fois (réception + 2 photos de la fiche obligatoires)
+    import base64 as b64
+    png = "data:image/png;base64," + b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 50).decode()
+    k = dict(base, no_bon="BL-KONPLE-1", kantite_resevwa=2995, jog_avan=100, jog_apre=3095)
+    r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=[png], kantite_resevwa=None, chofe=""))
+    assert r.status_code == 422
+    assert {"fotos", "kantite_resevwa", "chofe"} <= {e["chan"] for e in r.json()["detail"]["erreurs"]}
+    assert rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=["data:text/html;base64,PGI+"] * 2)).status_code == 422
+    d_avan, _ = _stock(sch, "Diesel")
+    r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=[png, png]))
+    assert r.status_code == 201, r.text
+    kp = r.json()
+    assert kp["statut"] == "FEMEN" and kp["kantite_resevwa"] == 2995 and kp["livraison_id"] and len(kp["fotos"]) == 2
+    assert [j["aksyon"] for j in kp["jounal"]] == ["KREYE", "RESEVWA", "FEMEN"]
+    assert round(_stock(sch, "Diesel")[0] - d_avan, 3) == 2995
+    f = rc.get(f"/api/resepsyon/livrezon/{kp['id']}/foto/{kp['fotos'][0]['id']}")
+    assert f.status_code == 200 and f.headers["content-type"] == "image/png" and f.content.startswith(b"\x89PNG")
+    assert p.get(f"/api/livrezon-admin/livrezon/{kp['id']}/foto/{kp['fotos'][1]['id']}").status_code == 200
+    assert rc.get(f"/api/livrezon-admin/livrezon/{kp['id']}/foto/{kp['fotos'][1]['id']}").status_code == 403
+    assert rc.get(f"/api/resepsyon/livrezon/{l['id']}/foto/{kp['fotos'][0]['id']}").status_code == 404
+    assert p.post(f"/api/livrezon-admin/livrezon/{kp['id']}/anile", json={"motif": "Test konple"}).status_code == 200
+    assert round(_stock(sch, "Diesel")[0] - d_avan, 3) == 0
     # Admin : approuver → en route
     r = p.post(f"/api/livrezon-admin/livrezon/{l['id']}/apwouve", json={})
     assert r.status_code == 200 and r.json()["statut"] == "AN_WOUT"
