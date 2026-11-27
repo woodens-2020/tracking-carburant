@@ -4758,6 +4758,7 @@ tr.jr-attente td:nth-child(4){opacity:1;font-style:normal}
     <div id="page-livrezon-kabiran" class="page">
       <div class="psp-tabs">
         <button class="psp-tab lvk-tab on" data-t="dashboard" onclick="lvkOnglet('dashboard')">📊 Tableau de bord</button>
+        <button class="psp-tab lvk-tab" data-t="registre" onclick="lvkOnglet('registre')">🛢 Gaz reçu</button>
         <button class="psp-tab lvk-tab" data-t="liste" onclick="lvkOnglet('liste')">🚚 Livraisons</button>
         <button class="psp-tab lvk-tab" data-t="kont" onclick="lvkOnglet('kont')">Comptes de réception</button>
         <button class="psp-tab lvk-tab" data-t="notif" onclick="lvkOnglet('notif')">Notifications</button>
@@ -42266,6 +42267,7 @@ async function lvkOnglet(t){
     else if(t === 'liste') await lvkListe();
     else if(t === 'kont') await lvkKont();
     else if(t === 'notif') await lvkNotif();
+    else if(t === 'registre') await lvkRegistre();
     else lvkApp();
   }catch(e){ c.innerHTML = `<div class="psp-card" style="color:var(--red2)">${_lvkE(e.message)}</div>`; }
 }
@@ -42352,6 +42354,120 @@ async function lvkDashboard(){
   LVK.charts.statut = new Chart(document.getElementById('lvk-ch-statut'), {type: 'doughnut',
     data: {labels: st.map(([s]) => _lvkST[s]), datasets: [{data: st.map(([, n]) => n), backgroundColor: st.map(([s]) => _lvkCol[s])}]},
     options: {maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}});
+}
+
+/* ── Registre du gaz reçu : une station, toutes les réceptions de la période ── */
+LVK.rg = {produit: '', konpayi: '', q: '', tri: 'resevwa_at', sens: -1, page: 1};
+function _lvkRgQs(){
+  const p = _lvkQs();
+  if(LVK.rg.produit) p.set('produit', LVK.rg.produit);
+  if(LVK.rg.konpayi) p.set('konpayi', LVK.rg.konpayi);
+  if(LVK.rg.q) p.set('q', LVK.rg.q);
+  return p;
+}
+function lvkRgPeriode(k){
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const a = new Date(), b = new Date();
+  if(k === '7') a.setDate(a.getDate() - 6);
+  else if(k === '30') a.setDate(a.getDate() - 29);
+  else if(k === 'mois') a.setDate(1);
+  else if(k === 'mois-1'){ a.setMonth(a.getMonth() - 1, 1); b.setDate(0); }
+  else if(k === 'an') a.setMonth(0, 1);
+  LVK.debut = iso(a); LVK.fin = iso(b); LVK.rg.page = 1; lvkOnglet('registre');
+}
+function lvkRgTri(c){
+  if(LVK.rg.tri === c) LVK.rg.sens = -LVK.rg.sens; else { LVK.rg.tri = c; LVK.rg.sens = c === 'resevwa_at' ? -1 : 1; }
+  LVK.rg.page = 1; lvkOnglet('registre');
+}
+async function lvkRegistre(){
+  const d = await GET('/livrezon-admin/resepsyon-lis?' + _lvkRgQs());
+  LVK.stations = d.stations; LVK.station = String(d.station_id);
+  LVK.debut = d.debut; LVK.fin = d.fin; LVK.rgData = d;
+  const R = LVK.rg, c = document.getElementById('lvk-contenu');
+  const L = d.lignes.slice().sort((x, y) => {
+    const a = x[R.tri], b = y[R.tri];
+    return (a == null ? -Infinity : a) < (b == null ? -Infinity : b) ? -R.sens : (a === b ? 0 : R.sens);
+  });
+  const PAR = 50, nbPages = Math.max(1, Math.ceil(L.length / PAR));
+  if(R.page > nbPages) R.page = nbPages;
+  const vue = L.slice((R.page - 1) * PAR, R.page * PAR);
+  const th = (c, l, r) => `<th class="${r ? 'r' : ''}" style="cursor:pointer;white-space:nowrap" onclick="lvkRgTri('${c}')">${l}${R.tri === c ? (R.sens > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  const opt = (v, cur) => `<option value="${_lvkE(v)}" ${v === cur ? 'selected' : ''}>${_lvkE(v)}</option>`;
+  const ecart = x => x == null ? '—' : `<span style="color:${Math.abs(x) > 0.0005 ? (x > 0 ? 'var(--red2)' : '#f59e0b') : 'var(--muted)'}">${x > 0 ? '−' : x < 0 ? '+' : ''}${_lvkG(Math.abs(x))}</span>`;
+  const pal = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
+  c.innerHTML = `
+    <div class="lvk-filtres">
+      <label>Station <select onchange="LVK.station=this.value;LVK.rg.page=1;LVK.rg.produit='';LVK.rg.konpayi='';lvkOnglet('registre')">
+        ${d.stations.map(s => `<option value="${s.id}" ${s.id === d.station_id ? 'selected' : ''}>${_lvkE(s.nom)}</option>`).join('')}</select></label>
+      <label>Du <input type="date" value="${d.debut}" onchange="LVK.debut=this.value;LVK.rg.page=1;lvkOnglet('registre')"></label>
+      <label>Au <input type="date" value="${d.fin}" onchange="LVK.fin=this.value;LVK.rg.page=1;lvkOnglet('registre')"></label>
+      <label>Produit <select onchange="LVK.rg.produit=this.value;LVK.rg.page=1;lvkOnglet('registre')"><option value="">Tous</option>${d.produits.map(v => opt(v, R.produit)).join('')}</select></label>
+      <label>Compagnie <select onchange="LVK.rg.konpayi=this.value;LVK.rg.page=1;lvkOnglet('registre')"><option value="">Toutes</option>${d.konpayis.map(v => opt(v, R.konpayi)).join('')}</select></label>
+      <label style="flex:1;min-width:200px">Recherche <input placeholder="N°, bon, kontre plen, camion, chauffeur…" value="${_lvkE(R.q)}"
+        onkeydown="if(event.key==='Enter'){LVK.rg.q=this.value;LVK.rg.page=1;lvkOnglet('registre')}"></label>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px;align-items:center">
+      <span class="psp-muted" style="font-size:12px;margin-right:4px">Période :</span>
+      ${[['7', '7 jours'], ['30', '30 jours'], ['mois', 'Ce mois'], ['mois-1', 'Mois dernier'], ['an', 'Cette année']]
+        .map(([k, l]) => `<button class="psp-tab" style="padding:4px 10px;font-size:12px" onclick="lvkRgPeriode('${k}')">${l}</button>`).join('')}
+      <span style="flex:1"></span>
+      <button class="psp-tab" onclick="lvkRgCsv()">⬇ Excel (CSV)</button>
+      <button class="psp-tab" onclick="lvkRgImprimer()">🖨 Imprimer</button>
+    </div>
+    <h3 style="margin:0 0 12px">🛢 Gaz reçu — ${_lvkE(d.station_nom)} <span class="psp-muted" style="font-size:13px;font-weight:500">${frDate(d.debut)} → ${frDate(d.fin)}</span></h3>
+    <div class="lvk-kpis">
+      ${d.totaux.length ? d.totaux.map((t, i) => `<div class="lvk-kpi" style="--c:${pal[i % pal.length]}"><div class="lvk-kl">${_lvkE(t.produit)}</div>
+        <div class="lvk-kv">${_lvkG(t.resevwa)}</div><div class="psp-muted">${t.kamyon} camion(s) · envoyé ${_lvkG(t.voye)} · écart ${ecart(t.ekat)}</div></div>`).join('')
+        : `<div class="lvk-kpi" style="--c:#7a9bbb"><div class="lvk-kl">Aucune réception</div><div class="lvk-kv">0</div><div class="psp-muted">sur la période et les filtres choisis</div></div>`}
+    </div>
+    <div class="psp-card"><div class="psp-head"><b>${L.length} réception(s)</b><span class="psp-muted">cliquez sur un en-tête pour trier</span></div>
+    ${L.length ? `<div style="overflow-x:auto"><table class="psp-tbl lvk-rg"><thead><tr>
+        ${th('resevwa_at', 'Date & heure')}${th('numero', 'N°')}${th('produit_nom', 'Produit')}${th('no_kontre_plen', 'Kontre plen')}
+        ${th('konpayi', 'Compagnie')}${th('no_bon', 'N° bon')}${th('plak_kamyon', 'Camion')}${th('chofe', 'Chauffeur')}
+        ${th('kantite_voye', 'Envoyé', 1)}${th('kantite_resevwa', 'Reçu', 1)}${th('ekat', 'Écart', 1)}${th('statut', 'Statut')}<th></th></tr></thead><tbody>
+      ${vue.map(l => `<tr><td style="white-space:nowrap">${_lvkDt(l.resevwa_at)}</td><td>${_lvkE(l.numero)}</td><td>${_lvkE(l.produit_nom)}</td>
+        <td>${_lvkE(l.no_kontre_plen || '—')}</td><td>${_lvkE(l.konpayi)}</td><td>${_lvkE(l.no_bon)}</td><td>${_lvkE(l.plak_kamyon)}</td>
+        <td>${_lvkE(l.chofe)}</td><td class="r">${_lvkG(l.kantite_voye)}</td><td class="r"><b>${_lvkG(l.kantite_resevwa)}</b></td>
+        <td class="r">${ecart(l.ekat)}</td><td>${_lvkB(l.statut)}</td>
+        <td style="white-space:nowrap"><button class="psp-tab" onclick="lvkDetail(${l.id})">Voir</button>
+        <a class="psp-tab" style="text-decoration:none" href="/api/livrezon-admin/livrezon/${l.id}/pdf" target="_blank">PDF</a></td></tr>`).join('')}
+      </tbody><tfoot>${d.totaux.map(t => `<tr style="font-weight:700;background:var(--panel2)"><td colspan="8">Total ${_lvkE(t.produit)} · ${t.kamyon} camion(s)</td>
+        <td class="r">${_lvkG(t.voye)}</td><td class="r">${_lvkG(t.resevwa)}</td><td class="r">${ecart(t.ekat)}</td><td colspan="2"></td></tr>`).join('')}</tfoot></table></div>
+      ${nbPages > 1 ? `<div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px">
+        <button class="psp-tab" ${R.page <= 1 ? 'disabled' : ''} onclick="LVK.rg.page--;lvkOnglet('registre')">‹ Précédent</button>
+        <span class="psp-muted">Page ${R.page} / ${nbPages}</span>
+        <button class="psp-tab" ${R.page >= nbPages ? 'disabled' : ''} onclick="LVK.rg.page++;lvkOnglet('registre')">Suivant ›</button></div>` : ''}`
+      : '<div class="psp-muted" style="padding:20px;text-align:center">Aucune réception de gaz pour cette station sur la période.</div>'}</div>`;
+}
+async function lvkRgCsv(){
+  try{
+    const h = {}; const k = sessionStorage.getItem('api_key'); if(k) h['X-API-Key'] = k;
+    const r = await fetch('/api/livrezon-admin/resepsyon-lis.csv?' + _lvkRgQs(), {headers: h, credentials: 'include'});
+    if(!r.ok) throw new Error('Export impossible (' + r.status + ')');
+    const nom = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'gaz-recu.csv';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = nom;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }catch(e){ notify(e.message, 'err'); }
+}
+function lvkRgImprimer(){
+  const d = LVK.rgData; if(!d) return;
+  const R = LVK.rg, E = _lvkE, G = _lvkG;
+  const filtres = [R.produit && 'Produit : ' + R.produit, R.konpayi && 'Compagnie : ' + R.konpayi, R.q && 'Recherche : ' + R.q].filter(Boolean).join(' · ');
+  const w = window.open('', '_blank'); if(!w) return notify('Autorisez les fenêtres pour imprimer.', 'err');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Gaz reçu — ${E(d.station_nom)}</title><style>
+    body{font:12px system-ui,Arial,sans-serif;color:#0f172a;margin:24px} h1{font-size:18px;margin:0} .m{color:#64748b;margin:2px 0 14px}
+    table{width:100%;border-collapse:collapse} th,td{border:1px solid #cbd5e1;padding:5px 6px;text-align:left} th{background:#f0fdfa}
+    .r{text-align:right;white-space:nowrap} tfoot td{font-weight:700;background:#f1f5f9} @page{size:landscape;margin:12mm}</style></head><body>
+    <h1>Gaz reçu — ${E(d.station_nom)}</h1><div class="m">Du ${frDate(d.debut)} au ${frDate(d.fin)}${filtres ? ' · ' + E(filtres) : ''} · ${d.lignes.length} réception(s)</div>
+    <table><thead><tr><th>Date & heure</th><th>N°</th><th>Produit</th><th>Kontre plen</th><th>Compagnie</th><th>N° bon</th><th>Camion</th><th>Chauffeur</th>
+      <th class="r">Envoyé</th><th class="r">Reçu</th><th class="r">Écart</th><th>Statut</th></tr></thead><tbody>
+    ${d.lignes.map(l => `<tr><td>${_lvkDt(l.resevwa_at)}</td><td>${E(l.numero)}</td><td>${E(l.produit_nom)}</td><td>${E(l.no_kontre_plen || '—')}</td>
+      <td>${E(l.konpayi)}</td><td>${E(l.no_bon)}</td><td>${E(l.plak_kamyon)}</td><td>${E(l.chofe)}</td><td class="r">${G(l.kantite_voye)}</td>
+      <td class="r">${G(l.kantite_resevwa)}</td><td class="r">${G(l.ekat)}</td><td>${E(l.statut_label || l.statut)}</td></tr>`).join('')}</tbody>
+    <tfoot>${d.totaux.map(t => `<tr><td colspan="8">Total ${E(t.produit)} · ${t.kamyon} camion(s)</td><td class="r">${G(t.voye)}</td><td class="r">${G(t.resevwa)}</td>
+      <td class="r">${G(t.ekat)}</td><td></td></tr>`).join('')}</tfoot></table>
+    <p class="m" style="margin-top:14px">Imprimé le ${new Date().toLocaleString('fr-FR')} — Konekta</p></body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
 
 async function lvkListe(){

@@ -129,6 +129,16 @@ def test_circuit_livrezon(client):
     assert [a["kantite_resevwa"] for a in t["arrivees"]] == [4900, 2998]          # chak kamyon, dènye an premye
     assert {a["station_id"] for a in t["arrivees"]} == {eid}
     assert {x["nom"] for x in t["stock"]} == {"Gazoline", "Diesel"}
+    # Registre du gaz reçu : la station seulement, filtres, totaux par produit, export CSV
+    g = p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}").json()
+    assert g["station_nom"] == "Station Livrezon" and len(g["lignes"]) == 2
+    assert g["totaux"] == [{"produit": "Diesel", "kamyon": 2, "voye": 8000, "resevwa": 7898, "ekat": 102}]
+    assert g["produits"] == ["Diesel"] and g["konpayis"] == ["Sol Haïti"]
+    assert p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}&produit=Gazoline").json()["lignes"] == []
+    assert len(p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}&q=KP-9").json()["lignes"]) == 2
+    r = p.get(f"/api/livrezon-admin/resepsyon-lis.csv?station_id={eid}")
+    assert r.status_code == 200 and "Station Livrezon" in r.text and "4900" in r.text
+    assert rc.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}").status_code == 403
     # Sans station : une seule station, jamais un cumul
     t0 = p.get("/api/livrezon-admin/dashboard").json()
     assert t0["station_id"] == t0["stations"][0]["id"]

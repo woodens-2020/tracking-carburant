@@ -882,6 +882,90 @@ def admin_lister(statut: Optional[str] = None, station_id: Optional[int] = None,
         return {"livrezons": [livrezon_dict(l) for l in rows]}
 
 
+# ── Registre du gaz reçu (une station à la fois) ────────────────────────
+
+RECUS = ("RESEVWA", "FEMEN", "EKAT")
+
+
+def _registre(station_id: Optional[int], debut: Optional[str], fin: Optional[str], produit: Optional[str],
+              konpayi: Optional[str], q: Optional[str]) -> dict:
+    toutes = _stations()
+    if station_id is None or not any(s["id"] == station_id for s in toutes):
+        station_id = toutes[0]["id"] if toutes else 0
+    st_nom = next((s["nom"] for s in toutes if s["id"] == station_id), "")
+    d, f, a, b = _periode(debut, fin)
+    with session_principale() as db:
+        base = db.query(LivrezonKabiran).filter(LivrezonKabiran.station_id == station_id,
+                                                LivrezonKabiran.statut.in_(RECUS),
+                                                LivrezonKabiran.resevwa_at >= a, LivrezonKabiran.resevwa_at < b)
+        # Choix possibles des filtres (sur la période, avant les filtres produit / compagnie)
+        produits = sorted({r[0] for r in base.with_entities(LivrezonKabiran.produit_nom).distinct()})
+        konpayis = sorted({r[0] for r in base.with_entities(LivrezonKabiran.konpayi).distinct()})
+        x = base
+        if produit:
+            x = x.filter(LivrezonKabiran.produit_nom == produit)
+        if konpayi:
+            x = x.filter(LivrezonKabiran.konpayi == konpayi)
+        if q and q.strip():
+            t = f"%{q.strip()}%"
+            x = x.filter(LivrezonKabiran.numero.ilike(t) | LivrezonKabiran.no_bon.ilike(t)
+                         | LivrezonKabiran.no_kontre_plen.ilike(t) | LivrezonKabiran.chofe.ilike(t)
+                         | LivrezonKabiran.plak_kamyon.ilike(t) | LivrezonKabiran.konpayi.ilike(t))
+        rows = x.order_by(LivrezonKabiran.resevwa_at.desc(), LivrezonKabiran.id.desc()).limit(5000).all()
+        lignes = [livrezon_dict(l) for l in rows]
+    tot = {}
+    for l in lignes:
+        e = tot.setdefault(l["produit_nom"], {"produit": l["produit_nom"], "kamyon": 0, "voye": 0.0, "resevwa": 0.0})
+        e["kamyon"] += 1
+        e["voye"] += l["kantite_voye"] or 0
+        e["resevwa"] += l["kantite_resevwa"] or 0
+    totaux = [{**e, "voye": round(e["voye"], 3), "resevwa": round(e["resevwa"], 3),
+               "ekat": round(e["voye"] - e["resevwa"], 3)} for e in sorted(tot.values(), key=lambda e: e["produit"])]
+    return {"debut": d.isoformat(), "fin": f.isoformat(), "station_id": station_id, "station_nom": st_nom,
+            "lignes": lignes, "totaux": totaux, "produits": produits, "konpayis": konpayis,
+            "stations": [{"id": s["id"], "nom": s["nom"]} for s in toutes]}
+
+
+@router.get("/api/livrezon-admin/resepsyon-lis")
+def registre(station_id: Optional[int] = None, debut: Optional[str] = None, fin: Optional[str] = None,
+             produit: Optional[str] = None, konpayi: Optional[str] = None, q: Optional[str] = None,
+             _u: Utilisateur = Depends(_require_superviseur)):
+    return _registre(station_id, debut, fin, produit, konpayi, q)
+
+
+@router.get("/api/livrezon-admin/resepsyon-lis.csv")
+def registre_csv(station_id: Optional[int] = None, debut: Optional[str] = None, fin: Optional[str] = None,
+                 produit: Optional[str] = None, konpayi: Optional[str] = None, q: Optional[str] = None,
+                 _u: Utilisateur = Depends(_require_superviseur)):
+    import csv
+    r = _registre(station_id, debut, fin, produit, konpayi, q)
+
+    def dh(s):
+        if not s:
+            return ""
+        dt = datetime.fromisoformat(s)
+        return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M")
+
+    def n(x):
+        return "" if x is None else f"{x:.3f}".rstrip("0").rstrip(".").replace(".", ",")
+
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")
+    w.writerow([f"Gaz reçu — {r['station_nom']}", f"du {r['debut']} au {r['fin']}"])
+    w.writerow(["Date & heure", "N°", "Produit", "Kontre plen", "Compagnie", "N° bon", "Camion", "Chauffeur",
+                "Envoyé (gal)", "Reçu (gal)", "Écart (gal)", "Statut", "Reçu par"])
+    for l in r["lignes"]:
+        w.writerow([dh(l["resevwa_at"]), l["numero"], l["produit_nom"], l["no_kontre_plen"] or "", l["konpayi"],
+                    l["no_bon"], l["plak_kamyon"], l["chofe"], n(l["kantite_voye"]), n(l["kantite_resevwa"]),
+                    n(l["ekat"]), l["statut_label"], l["resevwa_par"] or ""])
+    w.writerow([])
+    for t in r["totaux"]:
+        w.writerow([f"Total {t['produit']}", f"{t['kamyon']} camion(s)", "", "", "", "", "", "",
+                    n(t["voye"]), n(t["resevwa"]), n(t["ekat"])])
+    nom = re.sub(r"[^A-Za-z0-9]+", "-", r["station_nom"]).strip("-").lower() or "station"
+    return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="gaz-recu-{nom}-{r["debut"]}-{r["fin"]}.csv"'})
+
 @router.get("/api/livrezon-admin/livrezon/{lid}")
 def admin_detay(lid: int, _u: Utilisateur = Depends(_require_superviseur)):
     with session_principale() as db:
