@@ -31,9 +31,11 @@ def test_circuit_livrezon(client):
     assert p.post("/api/login", json=PROPRIO).status_code == 200
     # Une station séparée où livrer
     corps = {"nom": "Station Livrezon", "adresse": "Route test", "station": {
-        "produits": [{"cle": "g", "nom": "Gazoline", "prix": 900}, {"cle": "d", "nom": "Diesel", "prix": 950}],
+        "produits": [{"cle": "g", "nom": "Gazoline 1", "prix": 900}, {"cle": "d", "nom": "Diesel", "prix": 950},
+                     {"cle": "g2", "nom": "Gazoline 2", "prix": 900}],
         "pompes": [{"nom": "Pompe 1", "faces": [{"nom": "A", "metres": [
-            {"produit": "g", "nom": "G1", "metre_depart": 10}, {"produit": "d", "nom": "D1", "metre_depart": 10}]}]}]},
+            {"produit": "g", "nom": "G1", "metre_depart": 10}, {"produit": "d", "nom": "D1", "metre_depart": 10},
+            {"produit": "g2", "nom": "G2", "metre_depart": 10}]}]}]},
         "gerant": {"nom_complet": "Gérant Livrezon", "email": "gerant.livrezon@exemple.ht",
                    "password": "MotDePasse2026", "pin": "555666777"}}
     r = p.post("/api/espaces", json=corps)
@@ -64,7 +66,10 @@ def test_circuit_livrezon(client):
 
     st = rc.get("/api/resepsyon/stations").json()["stations"]
     ma = next(s for s in st if s["id"] == eid)
-    assert {x["nom"] for x in ma["produits"]} == {"Gazoline", "Diesel"}
+    # Seulement Gazoline / Diesel : « Gazoline 1 » et « Gazoline 2 » = un seul type
+    assert [x["nom"] for x in ma["produits"]] == ["Gazoline", "Diesel"]
+    gaz = ma["produits"][0]
+    assert len(gaz["produit_ids"]) == 2
     assert any(s["id"] == 0 for s in st)
 
     base = {"station_id": eid, "produit_id": diesel_id, "no_bon": "BL-2026-001", "kantite_voye": 3000,
@@ -94,6 +99,15 @@ def test_circuit_livrezon(client):
     # La réception ne peut pas annuler une livraison enregistrée
     assert rc.post(f"/api/livrezon-admin/livrezon/{l['id']}/anile", json={"motif": "x"}).status_code == 403
     assert rc.put(f"/api/livrezon-admin/livrezon/{l['id']}", json={"kantite_voye": 1}).status_code == 403
+    # Gazoline : la livraison entre dans le stock du type (1er produit), affichée sous « Gazoline »
+    g_avant, g1_id = _stock(sch, "Gazoline 1")
+    r = rc.post("/api/resepsyon/livrezon", json=dict(base, produit_id=gaz["produit_ids"][1], no_bon="BL-GAZ-1"))
+    assert r.status_code == 201 and r.json()["produit_nom"] == "Gazoline" and r.json()["produit_id"] == g1_id
+    assert rc.post(f"/api/resepsyon/livrezon/{r.json()['id']}/resevwa", json={"kantite_resevwa": 3000}).json()["statut"] == "FEMEN"
+    assert round(_stock(sch, "Gazoline 1")[0] - g_avant, 3) == 3000
+    ma2 = next(s for s in rc.get("/api/resepsyon/stations").json()["stations"] if s["id"] == eid)
+    assert ma2["produits"][0]["stock"] == round(gaz["stock"] + 3000, 3)
+    assert p.post(f"/api/livrezon-admin/livrezon/{r.json()['id']}/anile", json={"motif": "Test type"}).status_code == 200
     # Admin : approuver → en route
     r = p.post(f"/api/livrezon-admin/livrezon/{l['id']}/apwouve", json={})
     assert r.status_code == 200 and r.json()["statut"] == "AN_WOUT"

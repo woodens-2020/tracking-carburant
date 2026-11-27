@@ -35,20 +35,32 @@ main{max-width:620px;margin:0 auto;padding:16px 16px 120px}
 .btn.ghost{background:#fff;color:var(--pri);box-shadow:inset 0 0 0 2px var(--pri)}
 .btn.light{background:var(--soft);color:var(--pri);box-shadow:none}
 .btn.wa{background:#25D366;box-shadow:0 8px 20px rgba(37,211,102,.3)}
-/* Champs */
-.row{display:flex;gap:12px} .row>*{flex:1;min-width:0}
-label{display:block;font-weight:700;font-size:13.5px;margin:14px 0 6px;color:#334155}
-label .opt{font-weight:500;color:var(--mut)}
-input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#f8fafc;transition:border-color .15s,box-shadow .15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);background:#fff;box-shadow:0 0 0 4px rgba(15,118,110,.12)}
+/* Champs : tit → endikasyon → kaz, youn anba lòt */
+.fld{padding:14px 0;border-top:1px solid #eef2f6}
+.fld:first-of-type{border-top:0;padding-top:4px}
+.fld>label,.fld .lbl{display:block;font-weight:800;font-size:15.5px;margin:0;color:var(--ink)}
+.fld .req{color:var(--err);margin-left:2px}
+.fld .opt{font-weight:600;font-size:12px;color:var(--mut);background:#eef2f6;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:1px}
+.fld .hint{font-size:13.5px;color:var(--mut);margin:3px 0 10px;line-height:1.35}
+input,select,textarea{display:block;width:100%;min-height:54px;border:1.5px solid #d5dde6;border-radius:14px;padding:13px 15px;font-size:17px;background:#fff;transition:border-color .15s,box-shadow .15s}
+textarea{min-height:90px;resize:vertical}
+input::placeholder,textarea::placeholder{color:#a3afbd}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 4px rgba(15,118,110,.13)}
 .sel{position:relative}
-.sel select{appearance:none;-webkit-appearance:none;padding-right:44px;font-weight:700;font-size:17px;background:#fff;min-height:56px}
-.sel::after{content:"";position:absolute;right:18px;top:50%;width:10px;height:10px;border-right:2.5px solid var(--pri);border-bottom:2.5px solid var(--pri);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.sel select{appearance:none;-webkit-appearance:none;padding-right:46px;font-weight:700}
+.sel select:invalid,.sel select.vide{color:#8a97a6;font-weight:600}
+.sel::after{content:"";position:absolute;right:19px;top:50%;width:10px;height:10px;border-right:2.5px solid var(--pri);border-bottom:2.5px solid var(--pri);transform:translateY(-70%) rotate(45deg);pointer-events:none}
 .f-err input,.f-err select,.f-err textarea{border-color:var(--err);background:#fff8f8}
-.ferr{color:var(--err);font-size:13px;margin-top:5px;display:none;font-weight:600} .f-err .ferr{display:block}
-.tel{display:flex} .tel span{border:1.5px solid var(--line);border-right:0;border-radius:14px 0 0 14px;padding:13px 12px;background:#eef2f6;font-weight:800;color:#334155}
+.ferr{color:var(--err);font-size:13.5px;margin-top:7px;display:none;font-weight:700} .f-err .ferr{display:block}
+.f-err>label,.f-err .lbl{color:var(--err)}
+.tel{display:flex} .tel span{display:grid;place-items:center;border:1.5px solid #d5dde6;border-right:0;border-radius:14px 0 0 14px;padding:0 13px;background:#f1f5f9;font-weight:800;color:#334155}
 .tel input{border-radius:0 14px 14px 0}
-.auto{display:flex;align-items:center;gap:10px;background:var(--soft);color:var(--pri2);border-radius:14px;padding:12px 14px;font-weight:700;font-size:14px;margin-top:14px}
+.unit{position:relative} .unit input{padding-right:64px} .unit b{position:absolute;right:15px;top:50%;transform:translateY(-50%);color:var(--mut);font-size:14px;pointer-events:none}
+.info{display:flex;gap:10px;align-items:flex-start;background:var(--soft);color:var(--pri2);border-radius:14px;padding:12px 14px;font-size:14px;margin-top:6px}
+.info b{display:block}
+.stockline{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--pri2);background:var(--soft);border-radius:12px;padding:10px 12px;font-weight:700}
+.stockline.neg{color:var(--err);background:var(--errbg)}
+.barre-bas{position:sticky;bottom:0;margin:0 -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 28%)}
 /* Produits */
 .prods{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .prod{border:2px solid var(--line);background:#fff;border-radius:16px;padding:14px;text-align:left;position:relative}
@@ -240,50 +252,81 @@ async function nouveau(){
   form = {station_id: stations.length === 1 ? stations[0].id : null};
   dessinerForm();
 }
-function champ(id, label, attrs = '', opt = false){
-  return `<div id="f-${id}"><label for="i-${id}">${label}${opt ? ' <span class="opt">(opsyonèl)</span>' : ''}</label>
-    <input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="form['${id}']=this.value;nettoyer('${id}')"><div class="ferr"></div></div>`;
+/* Chan : tit → endikasyon → kaz (youn anba lòt) */
+function champ(id, titre, hint, attrs = '', opt = false, unite = ''){
+  const inp = `<input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="form['${id}']=this.value;nettoyer('${id}')">`;
+  return `<div class="fld" id="f-${id}"><label for="i-${id}">${titre}${opt ? '<span class="opt">opsyonèl</span>' : '<span class="req">*</span>'}</label>
+    <div class="hint">${hint}</div>${unite ? `<div class="unit">${inp}<b>${unite}</b></div>` : inp}<div class="ferr"></div></div>`;
+}
+function optsProduits(st){
+  if(!st) return '<option value="" selected disabled>Chwazi estasyon an anvan</option>';
+  if(!st.produits.length) return '<option value="" selected disabled>Pa gen kabiran nan estasyon sa a</option>';
+  return `<option value="" ${form.produit_id == null ? 'selected' : ''} disabled>— Chwazi tip kabiran an —</option>` +
+    st.produits.map(p => `<option value="${p.id}" ${p.id === form.produit_id ? 'selected' : ''}>${esc(p.nom)}</option>`).join('');
+}
+function ligneStock(){
+  const st = stations.find(s => s.id === form.station_id), p = st && st.produits.find(x => x.id === form.produit_id);
+  const z = $('#stock-info'); if(!z) return;
+  if(!p || p.stock == null){ z.className = 'hide'; return; }
+  z.className = 'stockline' + (p.stock < 0 ? ' neg' : '');
+  z.innerHTML = `<span>🛢 Stock ${esc(p.nom)} kounye a</span><b style="margin-left:auto;white-space:nowrap">${gal(p.stock)}</b>`;
 }
 function choisirStation(v){
-  form.station_id = v === '' ? null : Number(v); form.produit_id = null; dessinerForm();
+  form.station_id = v === '' ? null : Number(v);
+  const st = stations.find(s => s.id === form.station_id);
+  if(!st || !st.produits.some(p => p.id === form.produit_id)) form.produit_id = st && st.produits.length === 1 ? st.produits[0].id : null;
+  const sp = $('#i-produit'); sp.innerHTML = optsProduits(st); sp.disabled = !st; sp.classList.toggle('vide', form.produit_id == null);
+  $('#i-station').classList.remove('vide');
+  $('#st-adr').textContent = st && st.adresse ? '📍 ' + st.adresse : '';
+  nettoyer('station_id'); ligneStock();
+}
+function choisirProduit(v){
+  form.produit_id = v === '' ? null : Number(v);
+  $('#i-produit').classList.toggle('vide', form.produit_id == null);
+  nettoyer('produit_id'); ligneStock();
 }
 function dessinerForm(erreurs){
   const st = stations.find(s => s.id === form.station_id);
   ecran('Nouvo livrezon', `
     ${erreurs && erreurs.length ? `<div class="alert err">Gen ${erreurs.length} erè : korije chan ki an wouj yo.</div>` : ''}
     <div class="card">
-      <div class="sec-t"><span class="n">1</span>Estasyon k ap resevwa gaz la</div>
-      <div id="f-station_id"><div class="sel"><select id="i-station" aria-label="Estasyon" onchange="choisirStation(this.value)">
-        <option value="" ${st ? '' : 'selected'} disabled>— Chwazi estasyon an —</option>
-        ${stations.map(s => `<option value="${s.id}" ${s.id === form.station_id ? 'selected' : ''}>${esc(s.nom)}</option>`).join('')}
-      </select></div>${st && st.adresse ? `<div class="small muted" style="margin-top:6px">📍 ${esc(st.adresse)}</div>` : ''}<div class="ferr"></div></div>
-    </div>
-    ${st ? `<div class="card">
-      <div class="sec-t"><span class="n">2</span>Tip kabiran</div>
-      <div id="f-produit_id"><div class="prods">${st.produits.map((p, i) => `<button type="button" class="prod ${p.id === form.produit_id ? 'on' : ''}"
-         onclick="form.produit_id=${p.id};dessinerForm()"><b><i class="dot" style="background:${COUL[i % COUL.length]}"></i>${esc(p.nom)}</b>
-         <span>Stock : ${p.stock == null ? '—' : gal(p.stock)}</span></button>`).join('')
-         || '<div class="muted">Estasyon sa a pa gen kabiran anrejistre.</div>'}</div><div class="ferr"></div></div>
-    </div>` : ''}
-    <div class="card">
-      <div class="sec-t"><span class="n">3</span>Enfòmasyon livrezon</div>
-      <div class="row">${champ('no_kontre_plen', 'Kontre plen')}${champ('no_bon', 'No bon livrezon', 'autocapitalize="characters"')}</div>
-      <div class="row">${champ('kantite_voye', 'Kantite voye (gal)', 'type="number" inputmode="decimal" step="0.001" min="0"')}${champ('pri_galon', 'Pri / galon (G)', 'type="number" inputmode="decimal" step="0.01" min="0"', true)}</div>
-      ${champ('konpayi', 'Konpayi')}
-      <div class="auto">🕒 Dat & lè : otomatik (lè ou anrejistre a)</div>
+      <div class="sec-t"><span class="n">1</span>Estasyon & kabiran</div>
+      <div class="fld" id="f-station_id"><label for="i-station">Estasyon<span class="req">*</span></label>
+        <div class="hint">Estasyon kote kamyon an ap vide gaz la. Se stock estasyon sa a k ap monte.</div>
+        <div class="sel"><select id="i-station" class="${st ? '' : 'vide'}" onchange="choisirStation(this.value)">
+          <option value="" ${st ? '' : 'selected'} disabled>— Chwazi estasyon an —</option>
+          ${stations.map(s => `<option value="${s.id}" ${s.id === form.station_id ? 'selected' : ''}>${esc(s.nom)}</option>`).join('')}
+        </select></div><div class="small muted" id="st-adr" style="margin-top:6px">${st && st.adresse ? '📍 ' + esc(st.adresse) : ''}</div><div class="ferr"></div></div>
+      <div class="fld" id="f-produit_id"><label for="i-produit">Tip kabiran<span class="req">*</span></label>
+        <div class="hint">Gazoline oswa Diesel, jan li ekri sou bon livrezon an.</div>
+        <div class="sel"><select id="i-produit" class="${form.produit_id == null ? 'vide' : ''}" ${st ? '' : 'disabled'} onchange="choisirProduit(this.value)">${optsProduits(st)}</select></div>
+        <div id="stock-info" class="hide"></div><div class="ferr"></div></div>
     </div>
     <div class="card">
-      <div class="sec-t"><span class="n">4</span>Kamyon & chofè</div>
-      ${champ('chofe', 'Chofè', 'autocomplete="name"')}
-      <div id="f-telefon_chofe"><label for="i-telefon_chofe">Telefòn chofè</label>
+      <div class="sec-t"><span class="n">2</span>Livrezon</div>
+      ${champ('no_kontre_plen', 'Kontre plen', 'Enfòmasyon ki ekri sou fich kontre plen an.', 'autocapitalize="characters" placeholder="egz: KP-1024"')}
+      ${champ('no_bon', 'Nimewo bon livrezon', 'Nimewo ki sou bon konpayi a bay la.', 'autocapitalize="characters" placeholder="egz: BL-77881"')}
+      ${champ('kantite_voye', 'Kantite voye', 'Kantite galon ki ekri sou bon livrezon an.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3000"', false, 'galon')}
+      ${champ('konpayi', 'Konpayi', 'Konpayi ki voye gaz la.', 'placeholder="egz: Sol, Total, Dinasa…"')}
+      ${champ('pri_galon', 'Pri pa galon', 'Pri achte a, si ou konnen l.', 'type="number" inputmode="decimal" step="0.01" min="0" placeholder="egz: 610"', true, 'goud')}
+      <div class="info">🕒<div><b>Dat & lè : otomatik</b>Sistèm nan anrejistre lè ou peze « Anrejistre ».</div></div>
+    </div>
+    <div class="card">
+      <div class="sec-t"><span class="n">3</span>Kamyon & chofè</div>
+      ${champ('chofe', 'Non chofè a', 'Non konplè moun k ap kondui kamyon an.', 'autocomplete="name" placeholder="egz: Pierre Jean"')}
+      <div class="fld" id="f-telefon_chofe"><label for="i-telefon_chofe">Telefòn chofè a<span class="req">*</span></label>
+        <div class="hint">8 chif, san +509.</div>
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
           value="${esc(form.telefon_chofe ?? '')}" oninput="form.telefon_chofe=this.value;nettoyer('telefon_chofe')"></div><div class="ferr"></div></div>
-      ${champ('plak_kamyon', 'Plak kamyon', 'autocapitalize="characters"')}
-      <div id="f-komante"><label for="i-komante">Kòmantè <span class="opt">(opsyonèl)</span></label>
+      ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an.', 'autocapitalize="characters" placeholder="egz: AB-12345"')}
+      <div class="fld" id="f-komante"><label for="i-komante">Kòmantè<span class="opt">opsyonèl</span></label>
+        <div class="hint">Nenpòt lòt bagay ou vle direksyon an konnen.</div>
         <textarea id="i-komante" rows="3" oninput="form.komante=this.value">${esc(form.komante ?? '')}</textarea></div>
     </div>
-    <button class="btn" id="b-env" onclick="envoyer()">Anrejistre livrezon an</button>`, true);
+    <div class="barre-bas"><button class="btn" id="b-env" onclick="envoyer()">✓ Anrejistre livrezon an</button></div>`, true);
+  ligneStock();
   (erreurs || []).forEach(e => marquer(e.chan, e.message));
+  if(erreurs && erreurs.length){ const z = document.getElementById('f-' + erreurs[0].chan); if(z) z.scrollIntoView({block: 'center'}); }
 }
 function marquer(chan, msg){
   const z = document.getElementById('f-' + chan); if(!z) return;
@@ -317,7 +360,7 @@ async function envoyer(){
     aller(() => detail(l.id, 'Livrezon anrejistre. Lè kamyon an fin vide, konfime resepsyon an anba a.'));
   }catch(err){
     if(err.erreurs) return dessinerForm(err.erreurs);
-    b.disabled = false; b.textContent = 'Anrejistre livrezon an';
+    b.disabled = false; b.textContent = '✓ Anrejistre livrezon an';
     alert(err.message);
   }
 }
@@ -354,16 +397,21 @@ async function detail(id, msg){
     </div>
     ${attend ? `<div class="card" id="rec">
       <div class="sec-t"><span class="n">🛢</span>Konfime resepsyon an</div>
-      <div class="muted small">Lè kamyon an fin vide nan tank lan. Stock ${esc(l.station_nom)} ap mete ajou otomatikman.</div>
-      <div id="f-kantite_resevwa"><label for="r-q">Kantite resevwa (galon)</label>
-        <input id="r-q" type="number" inputmode="decimal" step="0.001" min="0" value="${l.kantite_voye}" style="font-size:20px;font-weight:800"><div class="ferr"></div></div>
-      <div class="row">
-        <div><label for="r-a">Jòj avan <span class="opt">(gal)</span></label><input id="r-a" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
-        <div><label for="r-p">Jòj apre <span class="opt">(gal)</span></label><input id="r-p" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
-      </div>
-      <div id="jog-info" class="small muted" style="margin-top:6px"></div>
-      <label for="r-c">Kòmantè <span class="opt">(opsyonèl)</span></label><textarea id="r-c" rows="2"></textarea>
-      <div style="height:14px"></div>
+      <div class="info" style="margin:0 0 6px">ℹ️<div>Fè sa lè kamyon an fin vide nan tank lan. Stock ${esc(l.produit_nom)} ${esc(l.station_nom)} ap monte otomatikman.</div></div>
+      <div class="fld" id="f-kantite_resevwa"><label for="r-q">Kantite resevwa<span class="req">*</span></label>
+        <div class="hint">Kantite galon ki antre vre nan tank lan (voye : ${gal(l.kantite_voye)}).</div>
+        <div class="unit"><input id="r-q" type="number" inputmode="decimal" step="0.001" min="0" value="${l.kantite_voye}" style="font-size:20px;font-weight:800"><b>galon</b></div><div class="ferr"></div></div>
+      <div class="fld"><label for="r-a">Jòj tank lan avan<span class="opt">opsyonèl</span></label>
+        <div class="hint">Kantite ki te nan tank lan anvan kamyon an vide.</div>
+        <div class="unit"><input id="r-a" type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 800" oninput="calcJog()"><b>galon</b></div></div>
+      <div class="fld"><label for="r-p">Jòj tank lan apre<span class="opt">opsyonèl</span></label>
+        <div class="hint">Kantite ki nan tank lan apre kamyon an fin vide.</div>
+        <div class="unit"><input id="r-p" type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3750" oninput="calcJog()"><b>galon</b></div>
+        <div id="jog-info" class="small muted" style="margin-top:8px"></div></div>
+      <div class="fld"><label for="r-c">Kòmantè<span class="opt">opsyonèl</span></label>
+        <div class="hint">Si gen yon pwoblèm oswa yon diferans, ekri l la.</div>
+        <textarea id="r-c" rows="2"></textarea></div>
+      <div style="height:6px"></div>
       <button class="btn" id="b-rec" onclick="recevoir(${l.id}, ${l.kantite_voye}, ${l.tolerans})">✓ Konfime resepsyon</button>
     </div>` : ''}
     ${l.kantite_resevwa != null ? `<button class="btn wa" style="margin-bottom:12px" onclick="partagerWA()">${IC_WA} Pataje sou WhatsApp</button>

@@ -172,6 +172,38 @@ def _produits_station(station_id: int, avec_stock: bool = False) -> list[dict]:
     return out
 
 
+def famille_carburant(nom: Optional[str]) -> str:
+    """Gazoline 1 / Gazoline 2 → « Gazoline » ; Diesel 1 / Diesel 2 → « Diesel »
+    (même règle que le reste du système : main._famille_carburant)."""
+    n = (nom or "").lower()
+    if "propan" in n:
+        return "Propane"
+    if "gaz" in n or "essence" in n:
+        return "Gazoline"
+    if "diesel" in n:
+        return "Diesel"
+    return (nom or "").strip() or "Inconnu"
+
+
+def _familles_station(station_id: int, avec_stock: bool = False) -> list[dict]:
+    """Types de carburant de la station : Gazoline, Diesel (jamais « Gazoline 1 / 2 »).
+    id = premier produit du type : c'est là que la livraison entre en stock ;
+    le stock affiché est la somme des produits du même type (même cuve)."""
+    fam: dict = {}
+    for p in _produits_station(station_id, avec_stock):
+        f = fam.setdefault(famille_carburant(p["nom"]), {"id": p["id"], "nom": famille_carburant(p["nom"]),
+                                                         "produit_ids": []})
+        f["produit_ids"].append(p["id"])
+        if avec_stock:
+            for k in ("stock", "moyenne_jour"):
+                f[k] = None if p.get(k) is None or (k in f and f[k] is None) else round(f.get(k, 0) + p[k], 3)
+            f["alerte_bas"] = bool(f.get("alerte_bas") or p.get("alerte_bas"))
+            f["jours_de_stock"] = (round(f["stock"] / f["moyenne_jour"], 1)
+                                   if f.get("stock") is not None and f.get("moyenne_jour") else None)
+    ordre = {"Gazoline": 0, "Diesel": 1, "Propane": 2}
+    return sorted(fam.values(), key=lambda f: (ordre.get(f["nom"], 9), f["nom"]))
+
+
 def _dernier_prix(station_id: int, produit_id: int) -> float:
     with session_espace(_schema(station_id)) as sdb:
         lv = (sdb.query(Livraison).filter(Livraison.produit_id == produit_id)
@@ -383,11 +415,12 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
         try:
             st = _station(data["station_id"])
             data["station_nom"] = st["nom"]
-            prods = {p["id"]: p["nom"] for p in _produits_station(st["id"])}
-            if data.get("produit_id") not in prods:
+            fams = _familles_station(st["id"])
+            f = next((f for f in fams if data.get("produit_id") in f["produit_ids"]), None)
+            if not f:
                 err("produit_id", "Chwazi yon kabiran estasyon sa a.")
             else:
-                data["produit_nom"] = prods[data["produit_id"]]
+                data["produit_id"], data["produit_nom"] = f["id"], f["nom"]   # Gazoline / Diesel
         except HTTPException:
             err("station_id", "Chwazi yon estasyon.")
     if erreurs:
@@ -642,7 +675,7 @@ def stations(_u: Utilisateur = Depends(_require_resepsyon)):
     out = []
     for st in _stations():
         try:
-            prods = _produits_station(st["id"], avec_stock=True)
+            prods = _familles_station(st["id"], avec_stock=True)
         except Exception:
             log.exception("produits station %s", st["id"])
             prods = []
@@ -1096,7 +1129,7 @@ def dashboard(debut: Optional[str] = None, fin: Optional[str] = None, station_id
         en_kou_d = [livrezon_dict(l) for l in en_kou]
         ekat_d = [livrezon_dict(l) for l in ekat_rows]
     try:
-        stock = _produits_station(station_id, True)
+        stock = _familles_station(station_id, True)
     except Exception:
         log.exception("stock station %s", station_id)
         stock = []
