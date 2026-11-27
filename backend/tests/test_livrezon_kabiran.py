@@ -76,11 +76,14 @@ def test_circuit_livrezon(client):
     chans = {e["chan"] for e in r.json()["detail"]["erreurs"]}
     assert {"telefon_chofe", "kantite_voye"} <= chans
     autre = max(principal_avant.values()) + 999
+    r = rc.post("/api/resepsyon/livrezon", json=dict(base, no_kontre_plen=" "))
+    assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "no_kontre_plen"
     r = rc.post("/api/resepsyon/livrezon", json=dict(base, produit_id=autre))
     assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "produit_id"
 
-    r = rc.post("/api/resepsyon/livrezon", json=base)
+    r = rc.post("/api/resepsyon/livrezon", json=dict(base, date_livrezon="2026-01-01T08:00"))
     assert r.status_code == 201, r.text
+    assert not r.json()["date_livrezon"].startswith("2026-01-01")   # dat & lè otomatik (sèvè a)
     l = r.json()
     assert l["statut"] == "VALIDE" and l["telefon_chofe"] == "+50934567890" and l["plak_kamyon"] == "AB-12345"
     assert l["station_nom"] == "Station Livrezon" and l["numero"].startswith("LVK-")
@@ -88,6 +91,9 @@ def test_circuit_livrezon(client):
     r = rc.post("/api/resepsyon/livrezon", json=dict(base, no_bon="bl 2026 001"))
     assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "no_bon"
 
+    # La réception ne peut pas annuler une livraison enregistrée
+    assert rc.post(f"/api/livrezon-admin/livrezon/{l['id']}/anile", json={"motif": "x"}).status_code == 403
+    assert rc.put(f"/api/livrezon-admin/livrezon/{l['id']}", json={"kantite_voye": 1}).status_code == 403
     # Admin : approuver → en route
     r = p.post(f"/api/livrezon-admin/livrezon/{l['id']}/apwouve", json={})
     assert r.status_code == 200 and r.json()["statut"] == "AN_WOUT"
@@ -119,9 +125,14 @@ def test_circuit_livrezon(client):
 
     # Tableau de bord
     t = p.get(f"/api/livrezon-admin/dashboard?station_id={eid}").json()
-    assert t["kpi"]["galon_resevwa"] == 7898 and t["kpi"]["nb_ekat"] == 1
-    assert t["par_station"][0]["non"] == "Station Livrezon"
-    assert sum(t["par_jour"][0]["valeurs"]) == 7898
+    assert t["station_nom"] == "Station Livrezon" and t["kpi"]["nb_kamyon"] == 2 and t["kpi"]["nb_ekat"] == 1
+    assert [a["kantite_resevwa"] for a in t["arrivees"]] == [4900, 2998]          # chak kamyon, dènye an premye
+    assert {a["station_id"] for a in t["arrivees"]} == {eid}
+    assert {x["nom"] for x in t["stock"]} == {"Gazoline", "Diesel"}
+    # Sans station : une seule station, jamais un cumul
+    t0 = p.get("/api/livrezon-admin/dashboard").json()
+    assert t0["station_id"] == t0["stations"][0]["id"]
+    assert all(a["station_id"] == t0["station_id"] for a in t0["arrivees"])
 
     # Clôture de l'écart puis annulation : le stock est retiré
     assert p.post(f"/api/livrezon-admin/livrezon/{l2['id']}/femen", json={"motif": ""}).status_code == 422

@@ -3,68 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#0b5f59">
 <title>Konekta Resepsyon</title>
 <link rel="manifest" href="/resepsyon/manifest.webmanifest">
 <link rel="icon" href="/resepsyon-app/favicon-64.png">
 <link rel="apple-touch-icon" href="/resepsyon-app/icone-apple-180.png">
 <style>
-:root{--bg:#eef2f7;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#dbe3ee;--pri:#0f766e;--pri2:#115e59;--ok:#15803d;--okbg:#dcfce7;
-  --err:#b91c1c;--errbg:#fee2e2;--warn:#b45309;--warnbg:#fef3c7;--blue:#1d4ed8;--bluebg:#dbeafe}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-button,input,select,textarea{font:inherit}
-.top{position:sticky;top:0;z-index:5;background:var(--pri);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
-.top h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:10px;padding:8px 12px;font-weight:700}
-main{max-width:640px;margin:0 auto;padding:16px 16px 110px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+:root{--bg:#f3f6f9;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e3e9f0;--pri:#0f766e;--pri2:#0b5f59;--pri3:#14b8a6;--soft:#e6f6f4;
+  --ok:#15803d;--okbg:#dcfce7;--err:#c62828;--errbg:#fdecec;--warn:#b45309;--warnbg:#fff4dc;--blue:#1d4ed8;--bluebg:#e3edff;
+  --sh:0 1px 2px rgba(15,23,42,.05),0 6px 18px rgba(15,23,42,.06)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+/* Barre du haut */
+.top{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,var(--pri2),var(--pri) 60%,#0d9488);color:#fff;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(11,95,89,.25)}
+.top h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800;letter-spacing:.2px}
+.top button{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:12px;height:40px;min-width:40px;padding:0 12px;font-weight:700;font-size:15px}
+.top button.ico{font-size:22px;padding:0}
+main{max-width:620px;margin:0 auto;padding:16px 16px 120px}
+/* Cartes */
+.card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:var(--sh)}
 .muted{color:var(--mut)} .small{font-size:13px}
-h2{font-size:17px;margin:4px 0 12px}
-.btn{display:block;width:100%;border:0;border-radius:14px;padding:15px 18px;font-weight:800;font-size:17px;background:var(--pri);color:#fff}
-.btn:disabled{opacity:.55} .btn.sec{background:#e2e8f0;color:var(--ink)} .btn.out{background:#fff;color:var(--pri);border:2px solid var(--pri)}
-.row{display:flex;gap:10px} .row>*{flex:1;min-width:0}
-label{display:block;font-weight:700;font-size:14px;margin:12px 0 5px}
-label .opt{font-weight:400;color:var(--mut)}
-input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:var(--ink)}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(15,118,110,.15)}
+.sec-t{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:0 0 14px}
+.sec-t .n{width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--pri);display:grid;place-items:center;font-size:14px;flex:none}
+/* Boutons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:16px;padding:16px 18px;font-weight:800;font-size:17px;
+  background:linear-gradient(135deg,var(--pri),#0d9488);color:#fff;box-shadow:0 8px 20px rgba(15,118,110,.28);text-decoration:none}
+.btn:active{transform:scale(.985)} .btn:disabled{opacity:.55}
+.btn.ghost{background:#fff;color:var(--pri);box-shadow:inset 0 0 0 2px var(--pri)}
+.btn.light{background:var(--soft);color:var(--pri);box-shadow:none}
+/* Champs */
+.row{display:flex;gap:12px} .row>*{flex:1;min-width:0}
+label{display:block;font-weight:700;font-size:13.5px;margin:14px 0 6px;color:#334155}
+label .opt{font-weight:500;color:var(--mut)}
+input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#f8fafc;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);background:#fff;box-shadow:0 0 0 4px rgba(15,118,110,.12)}
+.sel{position:relative}
+.sel select{appearance:none;-webkit-appearance:none;padding-right:44px;font-weight:700;font-size:17px;background:#fff;min-height:56px}
+.sel::after{content:"";position:absolute;right:18px;top:50%;width:10px;height:10px;border-right:2.5px solid var(--pri);border-bottom:2.5px solid var(--pri);transform:translateY(-70%) rotate(45deg);pointer-events:none}
 .f-err input,.f-err select,.f-err textarea{border-color:var(--err);background:#fff8f8}
-.ferr{color:var(--err);font-size:13px;margin-top:4px;display:none} .f-err .ferr{display:block}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;text-align:left;min-width:0}
-.chip.on{border-color:var(--pri);background:#ecfdf5;box-shadow:0 0 0 2px rgba(15,118,110,.2)}
-.chip b{display:block} .chip span{font-size:12px;color:var(--mut)}
-.tel{display:flex} .tel span{border:1.5px solid var(--line);border-right:0;border-radius:12px 0 0 12px;padding:12px 10px;background:#f1f5f9;font-weight:700}
-.tel input{border-radius:0 12px 12px 0}
-.badge{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800}
+.ferr{color:var(--err);font-size:13px;margin-top:5px;display:none;font-weight:600} .f-err .ferr{display:block}
+.tel{display:flex} .tel span{border:1.5px solid var(--line);border-right:0;border-radius:14px 0 0 14px;padding:13px 12px;background:#eef2f6;font-weight:800;color:#334155}
+.tel input{border-radius:0 14px 14px 0}
+.auto{display:flex;align-items:center;gap:10px;background:var(--soft);color:var(--pri2);border-radius:14px;padding:12px 14px;font-weight:700;font-size:14px;margin-top:14px}
+/* Produits */
+.prods{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.prod{border:2px solid var(--line);background:#fff;border-radius:16px;padding:14px;text-align:left;position:relative}
+.prod b{display:block;font-size:16px} .prod span{font-size:12.5px;color:var(--mut)}
+.prod .dot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:0}
+.prod.on{border-color:var(--pri);background:var(--soft);box-shadow:0 0 0 3px rgba(15,118,110,.15)}
+.prod.on::after{content:"✓";position:absolute;top:10px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--pri);color:#fff;font-size:13px;font-weight:900;display:grid;place-items:center}
+/* Statuts, liste */
+.badge{display:inline-block;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;white-space:nowrap}
 .s-VALIDE{background:var(--bluebg);color:var(--blue)} .s-AN_WOUT{background:var(--warnbg);color:var(--warn)}
-.s-RESEVWA,.s-FEMEN{background:var(--okbg);color:var(--ok)} .s-EKAT,.s-REJTE{background:var(--errbg);color:var(--err)} .s-ANILE{background:#e2e8f0;color:#475569}
-.item{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.s-RESEVWA,.s-FEMEN{background:var(--okbg);color:var(--ok)} .s-EKAT,.s-REJTE{background:var(--errbg);color:var(--err)} .s-ANILE{background:#e9eef3;color:#475569}
+.item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:0;border-radius:18px;padding:14px;margin-bottom:10px;box-shadow:var(--sh)}
+.item .av{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;flex:none;background:var(--soft)}
+.item .tx{flex:1;min-width:0}
 .item .l1{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:800}
-.item .l2{color:var(--mut);font-size:14px;margin-top:3px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:15px}
-.kv dt{color:var(--mut)} .kv dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}
-.alert{border-radius:14px;padding:12px 14px;margin-bottom:14px;font-weight:600}
+.item .l2{color:var(--mut);font-size:13.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;font-size:15px;margin:0}
+.kv dt{color:var(--mut)} .kv dd{margin:0;font-weight:700;text-align:right;overflow-wrap:anywhere}
+.alert{border-radius:16px;padding:13px 15px;margin-bottom:14px;font-weight:600;font-size:15px}
 .alert.err{background:var(--errbg);color:var(--err)} .alert.ok{background:var(--okbg);color:var(--ok)} .alert.warn{background:var(--warnbg);color:var(--warn)}
-.fab{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:608px;margin:0 auto;box-shadow:0 10px 25px rgba(15,118,110,.35)}
-.pin{display:flex;justify-content:center;gap:10px;margin:18px 0}
-.pin i{width:16px;height:16px;border-radius:50%;border:2px solid var(--pri)} .pin i.on{background:var(--pri)}
-.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:330px;margin:0 auto}
-.pad button{border:0;background:#fff;border-radius:16px;padding:18px 0;font-size:24px;font-weight:800;box-shadow:0 1px 0 var(--line)}
-.logo{text-align:center;margin:30px 0 10px} .logo img{width:84px;height:84px;border-radius:20px}
-.tabs{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
-.tabs button{border:0;border-radius:999px;padding:8px 14px;background:#e2e8f0;font-weight:700;white-space:nowrap}
-.tabs button.on{background:var(--pri);color:#fff}
-.big{font-size:28px;font-weight:900}
-.jl{border-left:3px solid var(--line);padding:2px 0 8px 12px;font-size:14px}
+.fab{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:588px;margin:0 auto;z-index:4}
+/* Héros */
+.hero{background:linear-gradient(135deg,var(--pri2),var(--pri) 55%,#0d9488);color:#fff;border-radius:22px;padding:18px;margin-bottom:14px;box-shadow:0 10px 26px rgba(11,95,89,.25)}
+.hero .hi{font-size:13px;opacity:.85} .hero .nm{font-size:20px;font-weight:800;margin-top:2px}
+.hero .stats{display:flex;gap:10px;margin-top:14px}
+.hero .stats div{flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:10px 12px}
+.hero .stats b{display:block;font-size:22px} .hero .stats span{font-size:12.5px;opacity:.9}
+.big{font-size:32px;font-weight:900;letter-spacing:-.5px}
+/* Onglets */
+.seg{display:flex;background:#e6ebf1;border-radius:14px;padding:4px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:transparent;border-radius:11px;padding:10px 8px;font-weight:700;font-size:14px;color:#475569}
+.seg button.on{background:#fff;color:var(--pri);box-shadow:0 1px 4px rgba(15,23,42,.12)}
+.vide{text-align:center;padding:30px 18px;color:var(--mut)} .vide .e{font-size:40px;margin-bottom:6px}
+/* Connexion */
+.login{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center}
+.logo{text-align:center;margin:10px 0 18px} .logo img{width:92px;height:92px;border-radius:24px;box-shadow:0 12px 30px rgba(15,118,110,.3)}
+.logo h2{margin:14px 0 2px;font-size:22px} .logo p{margin:0;color:var(--mut);font-size:14px}
+.code{text-transform:uppercase;font-size:24px;letter-spacing:5px;text-align:center;font-weight:800;background:#fff}
+.pin{display:flex;justify-content:center;gap:12px;margin:20px 0}
+.pin i{width:16px;height:16px;border-radius:50%;background:#d8e0e8;transition:transform .15s,background .15s} .pin i.on{background:var(--pri);transform:scale(1.15)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:320px;margin:0 auto}
+.pad button{border:0;background:#fff;border-radius:18px;height:64px;font-size:26px;font-weight:800;box-shadow:var(--sh)}
+.pad button:active{background:var(--soft)} .pad button.t{font-size:14px;color:var(--pri);background:transparent;box-shadow:none}
+.jl{position:relative;padding:0 0 12px 20px;font-size:14px}
+.jl::before{content:"";position:absolute;left:5px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--pri3)}
+.jl::after{content:"";position:absolute;left:9px;top:18px;bottom:0;width:1.5px;background:var(--line)}
+.jl:last-child::after{display:none}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:r 1s linear infinite;vertical-align:-3px}
+.spin.d{border-color:#cbd5e1;border-top-color:var(--pri);width:28px;height:28px}
 @keyframes r{to{transform:rotate(360deg)}}
 .hide{display:none!important}
 </style>
 </head>
 <body>
 <div class="top" id="top">
-  <button id="b-back" class="hide" onclick="retour()">‹</button>
+  <button id="b-back" class="ico hide" onclick="retour()" aria-label="Retounen">‹</button>
   <h1 id="titre">Konekta Resepsyon</h1>
   <button id="b-out" class="hide" onclick="deconnecter()">Soti</button>
 </div>
@@ -78,6 +117,8 @@ const gal = x => x == null ? '—' : Number(x).toLocaleString('fr-FR', {maximumF
 const dt = s => s ? new Date(s).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
 const ST = {VALIDE:'Valide', AN_WOUT:'An wout', RESEVWA:'Resevwa', FEMEN:'Fèmen', EKAT:'Ekat', REJTE:'Rejte', ANILE:'Anile'};
 const badge = s => `<span class="badge s-${s}">${ST[s] || s}</span>`;
+const COUL = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
+const charge = `<div class="vide"><span class="spin d"></span></div>`;
 let moi = null, stations = [], pile = [], form = {}, onglet = 'tann';
 
 async function api(method, path, body){
@@ -95,7 +136,7 @@ async function api(method, path, body){
 function ecran(titre, html, retourPossible){
   $('#titre').textContent = titre;
   $('#b-back').classList.toggle('hide', !retourPossible);
-  $('#b-out').classList.toggle('hide', !moi);
+  $('#b-out').classList.toggle('hide', !moi || !!retourPossible);
   $('#app').innerHTML = html;
   window.scrollTo(0, 0);
 }
@@ -106,18 +147,15 @@ function retour(){ pile.pop(); (pile[pile.length - 1] || accueil)(); }
 let code = '', pin = '';
 function ecranCode(msg){
   pile = [];
-  ecran('Konekta Resepsyon', `
-    <div class="logo"><img src="/resepsyon-app/icone-192.png" alt=""></div>
+  ecran('Konekta Resepsyon', `<div class="login">
+    <div class="logo"><img src="/resepsyon-app/icone-192.png" alt=""><h2>Resepsyon kabiran</h2><p>Anrejistre gaz ki rive nan estasyon an</p></div>
     <div class="card">
-      <h2>Konekte</h2>
       ${msg ? `<div class="alert err">${esc(msg)}</div>` : ''}
-      <label for="c">Kòd itilizatè <span class="opt">(4 chif + 4 lèt)</span></label>
-      <input id="c" autocomplete="username" autocapitalize="characters" maxlength="8" placeholder="egz: 4827KXMT" value="${esc(code)}"
-             style="text-transform:uppercase;font-size:22px;letter-spacing:3px;text-align:center">
-      <div style="height:14px"></div>
-      <button class="btn" id="bc" onclick="validerCode()">Kontinye</button>
-    </div>
-    <p class="small muted" style="text-align:center">Livrezon kabiran · Réception du carburant</p>`);
+      <label for="c" style="margin-top:0">Kòd itilizatè <span class="opt">(4 chif + 4 lèt)</span></label>
+      <input id="c" class="code" autocomplete="username" autocapitalize="characters" maxlength="8" placeholder="4827KXMT" value="${esc(code)}">
+      <div style="height:16px"></div>
+      <button class="btn" id="bc" onclick="validerCode()">Kontinye →</button>
+    </div></div>`);
   const i = $('#c'); i.focus();
   i.addEventListener('keydown', e => { if(e.key === 'Enter') validerCode(); });
 }
@@ -130,16 +168,15 @@ async function validerCode(){
 }
 function ecranPin(prenom, msg){
   pin = '';
-  ecran('Konekta Resepsyon', `
-    <div class="card" style="text-align:center">
-      <h2>Bonjou ${esc(prenom || '')} 👋</h2>
-      <div class="muted">Antre PIN ou (6 chif)</div>
-      ${msg ? `<div class="alert err" style="margin-top:12px">${esc(msg)}</div>` : ''}
-      <div class="pin" id="pin">${'<i></i>'.repeat(6)}</div>
-      <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="touche('${n}')">${n}</button>`).join('')}
-        <button onclick="ecranCode()" style="font-size:15px">Chanje kòd</button><button onclick="touche('0')">0</button>
-        <button onclick="touche('del')">⌫</button></div>
-    </div>`);
+  ecran('Konekta Resepsyon', `<div class="login" style="text-align:center">
+    <div class="logo" style="margin-bottom:4px"><img src="/resepsyon-app/icone-192.png" alt="" style="width:70px;height:70px;border-radius:20px">
+      <h2>Bonjou ${esc(prenom || '')} 👋</h2><p>Antre PIN ou (6 chif)</p></div>
+    ${msg ? `<div class="alert err">${esc(msg)}</div>` : ''}
+    <div class="pin" id="pin">${'<i></i>'.repeat(6)}</div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n => `<button onclick="touche('${n}')">${n}</button>`).join('')}
+      <button class="t" onclick="ecranCode()">Chanje kòd</button><button onclick="touche('0')">0</button>
+      <button class="t" style="font-size:24px" onclick="touche('del')" aria-label="Efase">⌫</button></div>
+  </div>`);
   window.__prenom = prenom;
 }
 async function touche(t){
@@ -162,74 +199,80 @@ async function demarrer(){
 }
 async function accueil(){
   pile = [accueil];
-  ecran('Livrezon kabiran', `<div class="muted" style="text-align:center;padding:30px"><span class="spin" style="border-color:#cbd5e1;border-top-color:var(--pri)"></span></div>`);
+  ecran('Livrezon kabiran', charge);
   let L = [];
   try{ L = (await api('GET', '/api/resepsyon/livrezon')).livrezons; }
   catch(e){ if(e.status === 401) return ecranCode(); return ecran('Livrezon kabiran', `<div class="alert err">${esc(e.message)}</div>`); }
-  const tann = L.filter(l => l.statut === 'VALIDE' || l.statut === 'AN_WOUT');
-  const fini = L.filter(l => !(l.statut === 'VALIDE' || l.statut === 'AN_WOUT'));
+  const enKou = l => l.statut === 'VALIDE' || l.statut === 'AN_WOUT';
+  const tann = L.filter(enKou), fini = L.filter(l => !enKou(l));
   const liste = onglet === 'tann' ? tann : fini;
   ecran('Livrezon kabiran', `
-    <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-      <div><div class="muted small">Konekte</div><b>${esc(moi.nom_complet)}</b> <span class="muted small">${esc(moi.username)}</span></div>
-      <button class="btn sec" style="width:auto;padding:10px 14px;font-size:14px" onclick="accueil()">↻</button>
+    <div class="hero">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div><div class="hi">Konekte kòm</div><div class="nm">${esc(moi.nom_complet)}</div><div class="hi">${esc(moi.username)}</div></div>
+        <button onclick="accueil()" aria-label="Rafrechi" style="border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:12px;width:42px;height:42px;font-size:18px">↻</button>
+      </div>
+      <div class="stats"><div><b>${tann.length}</b><span>k ap tann</span></div><div><b>${fini.filter(l => l.statut !== 'ANILE' && l.statut !== 'REJTE').length}</b><span>resevwa</span></div></div>
     </div>
-    <div class="tabs">
-      <button class="${onglet === 'tann' ? 'on' : ''}" onclick="onglet='tann';accueil()">🚚 K ap tann (${tann.length})</button>
-      <button class="${onglet === 'fini' ? 'on' : ''}" onclick="onglet='fini';accueil()">✅ Resevwa / lòt (${fini.length})</button>
+    <div class="seg">
+      <button class="${onglet === 'tann' ? 'on' : ''}" onclick="onglet='tann';accueil()">🚚 K ap tann</button>
+      <button class="${onglet === 'fini' ? 'on' : ''}" onclick="onglet='fini';accueil()">✅ Resevwa</button>
     </div>
-    ${liste.length ? liste.map(item).join('') : `<div class="card muted" style="text-align:center">${onglet === 'tann'
-      ? 'Pa gen livrezon k ap tann. Peze « + Nouvo livrezon » lè kamyon an rive.' : 'Poko gen livrezon resevwa.'}</div>`}
-    <button class="btn fab" onclick="aller(nouveau)">+ Nouvo livrezon</button>`);
+    ${liste.length ? liste.map(item).join('') : `<div class="card vide"><div class="e">${onglet === 'tann' ? '🚛' : '📭'}</div>${onglet === 'tann'
+      ? 'Pa gen livrezon k ap tann.<br>Peze « Nouvo livrezon » lè kamyon an rive.' : 'Poko gen livrezon resevwa.'}</div>`}
+    <button class="btn fab" onclick="aller(nouveau)">＋ Nouvo livrezon</button>`);
 }
 function item(l){
+  const ic = {VALIDE: '🚚', AN_WOUT: '🚚', RESEVWA: '✅', FEMEN: '✅', EKAT: '⚠️', REJTE: '⛔', ANILE: '⛔'}[l.statut] || '⛽';
   return `<button class="item" onclick="aller(()=>detail(${l.id}))">
-    <div class="l1"><span>${esc(l.produit_nom)} · ${gal(l.kantite_voye)}</span>${badge(l.statut)}</div>
-    <div class="l2">📍 ${esc(l.station_nom)} · ${dt(l.date_livrezon)}</div>
-    <div class="l2">🚛 ${esc(l.plak_kamyon)} · ${esc(l.konpayi)} · Bon ${esc(l.no_bon)}</div></button>`;
+    <div class="av">${ic}</div>
+    <div class="tx"><div class="l1"><span>${esc(l.produit_nom)} · ${gal(l.kantite_resevwa ?? l.kantite_voye)}</span>${badge(l.statut)}</div>
+    <div class="l2">📍 ${esc(l.station_nom)} · ${dt(l.resevwa_at || l.date_livrezon)}</div>
+    <div class="l2">🚛 ${esc(l.plak_kamyon)} · ${esc(l.konpayi)}</div></div></button>`;
 }
 
 /* ── Formulaire de livraison ───────────────────────────── */
-function maintenantLocal(){
-  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
 async function nouveau(){
-  ecran('Nouvo livrezon', `<div class="muted" style="text-align:center;padding:30px">Chajman estasyon yo…</div>`, true);
+  ecran('Nouvo livrezon', charge, true);
   try{ stations = (await api('GET', '/api/resepsyon/stations')).stations; }
   catch(e){ return ecran('Nouvo livrezon', `<div class="alert err">${esc(e.message)}</div>`, true); }
-  form = {date_livrezon: maintenantLocal(), station_id: stations.length === 1 ? stations[0].id : null};
+  form = {station_id: stations.length === 1 ? stations[0].id : null};
   dessinerForm();
 }
 function champ(id, label, attrs = '', opt = false){
   return `<div id="f-${id}"><label for="i-${id}">${label}${opt ? ' <span class="opt">(opsyonèl)</span>' : ''}</label>
     <input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="form['${id}']=this.value;nettoyer('${id}')"><div class="ferr"></div></div>`;
 }
+function choisirStation(v){
+  form.station_id = v === '' ? null : Number(v); form.produit_id = null; dessinerForm();
+}
 function dessinerForm(erreurs){
   const st = stations.find(s => s.id === form.station_id);
   ecran('Nouvo livrezon', `
     ${erreurs && erreurs.length ? `<div class="alert err">Gen ${erreurs.length} erè : korije chan ki an wouj yo.</div>` : ''}
     <div class="card">
-      <h2>1. Ki estasyon k ap resevwa gaz la?</h2>
-      <div id="f-station_id"><div class="chips">${stations.map(s => `<button type="button" class="chip ${s.id === form.station_id ? 'on' : ''}"
-         onclick="form.station_id=${s.id};form.produit_id=null;dessinerForm()"><b>${esc(s.nom)}</b><span>${esc(s.adresse || '')}</span></button>`).join('')}</div>
-        <div class="ferr"></div></div>
+      <div class="sec-t"><span class="n">1</span>Estasyon k ap resevwa gaz la</div>
+      <div id="f-station_id"><div class="sel"><select id="i-station" aria-label="Estasyon" onchange="choisirStation(this.value)">
+        <option value="" ${st ? '' : 'selected'} disabled>— Chwazi estasyon an —</option>
+        ${stations.map(s => `<option value="${s.id}" ${s.id === form.station_id ? 'selected' : ''}>${esc(s.nom)}</option>`).join('')}
+      </select></div>${st && st.adresse ? `<div class="small muted" style="margin-top:6px">📍 ${esc(st.adresse)}</div>` : ''}<div class="ferr"></div></div>
     </div>
     ${st ? `<div class="card">
-      <h2>2. Tip kabiran</h2>
-      <div id="f-produit_id"><div class="chips">${st.produits.map(p => `<button type="button" class="chip ${p.id === form.produit_id ? 'on' : ''}"
-         onclick="form.produit_id=${p.id};dessinerForm()"><b>${esc(p.nom)}</b><span>Stock: ${p.stock == null ? '—' : gal(p.stock)}</span></button>`).join('')
+      <div class="sec-t"><span class="n">2</span>Tip kabiran</div>
+      <div id="f-produit_id"><div class="prods">${st.produits.map((p, i) => `<button type="button" class="prod ${p.id === form.produit_id ? 'on' : ''}"
+         onclick="form.produit_id=${p.id};dessinerForm()"><b><i class="dot" style="background:${COUL[i % COUL.length]}"></i>${esc(p.nom)}</b>
+         <span>Stock : ${p.stock == null ? '—' : gal(p.stock)}</span></button>`).join('')
          || '<div class="muted">Estasyon sa a pa gen kabiran anrejistre.</div>'}</div><div class="ferr"></div></div>
     </div>` : ''}
     <div class="card">
-      <h2>3. Enfòmasyon livrezon</h2>
-      ${champ('date_livrezon', 'Dat & lè', 'type="datetime-local"')}
-      <div class="row">${champ('no_bon', 'No bon livrezon', 'autocapitalize="characters"')}${champ('no_kontre_plen', 'No kontre-plen', '', true)}</div>
-      <div class="row">${champ('kantite_voye', 'Kantite (galon)', 'type="number" inputmode="decimal" step="0.001" min="0"')}${champ('pri_galon', 'Pri / galon (G)', 'type="number" inputmode="decimal" step="0.01" min="0"', true)}</div>
+      <div class="sec-t"><span class="n">3</span>Enfòmasyon livrezon</div>
+      <div class="row">${champ('no_kontre_plen', 'Kontre plen')}${champ('no_bon', 'No bon livrezon', 'autocapitalize="characters"')}</div>
+      <div class="row">${champ('kantite_voye', 'Kantite voye (gal)', 'type="number" inputmode="decimal" step="0.001" min="0"')}${champ('pri_galon', 'Pri / galon (G)', 'type="number" inputmode="decimal" step="0.01" min="0"', true)}</div>
       ${champ('konpayi', 'Konpayi')}
+      <div class="auto">🕒 Dat & lè : otomatik (lè ou anrejistre a)</div>
     </div>
     <div class="card">
-      <h2>4. Kamyon & chofè</h2>
+      <div class="sec-t"><span class="n">4</span>Kamyon & chofè</div>
       ${champ('chofe', 'Chofè', 'autocomplete="name"')}
       <div id="f-telefon_chofe"><label for="i-telefon_chofe">Telefòn chofè</label>
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
@@ -250,7 +293,7 @@ function verifierLocal(){
   const e = [];
   if(form.station_id == null) e.push({chan: 'station_id', message: 'Chwazi estasyon an.'});
   if(form.station_id != null && form.produit_id == null) e.push({chan: 'produit_id', message: 'Chwazi tip kabiran an.'});
-  for(const [c, l] of [['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè'], ['plak_kamyon', 'Plak kamyon'], ['date_livrezon', 'Dat & lè']])
+  for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè'], ['plak_kamyon', 'Plak kamyon']])
     if(!String(form[c] || '').trim()) e.push({chan: c, message: l + ' obligatwa.'});
   const q = Number(form.kantite_voye);
   if(!(q > 0)) e.push({chan: 'kantite_voye', message: 'Kantite a dwe plis pase 0.'});
@@ -262,15 +305,15 @@ async function envoyer(){
   const e = verifierLocal();
   if(e.length) return dessinerForm(e);
   const b = $('#b-env'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Ap anrejistre…';
-  const corps = {station_id: form.station_id, produit_id: form.produit_id, date_livrezon: form.date_livrezon,
-    no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen || null, kantite_voye: Number(form.kantite_voye),
+  const corps = {station_id: form.station_id, produit_id: form.produit_id,
+    no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: Number(form.kantite_voye),
     pri_galon: form.pri_galon === '' || form.pri_galon == null ? null : Number(form.pri_galon),
     chofe: form.chofe, telefon_chofe: '+509' + String(form.telefon_chofe).replace(/\D/g, ''),
     plak_kamyon: form.plak_kamyon, konpayi: form.konpayi, komante: form.komante || null};
   try{
     const l = await api('POST', '/api/resepsyon/livrezon', corps);
     pile.pop(); onglet = 'tann';
-    aller(() => detail(l.id, 'Livrezon ' + l.numero + ' anrejistre. Lè kamyon an fin vide, konfime resepsyon an anba a.'));
+    aller(() => detail(l.id, 'Livrezon anrejistre. Lè kamyon an fin vide, konfime resepsyon an anba a.'));
   }catch(err){
     if(err.erreurs) return dessinerForm(err.erreurs);
     b.disabled = false; b.textContent = 'Anrejistre livrezon an';
@@ -285,46 +328,48 @@ async function detail(id, msg){
   catch(e){ return ecran('Livrezon', `<div class="alert err">${esc(e.message)}</div>`, true); }
   const kv = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   const attend = l.statut === 'VALIDE' || l.statut === 'AN_WOUT';
-  ecran(l.numero, `
+  ecran(l.station_nom, `
     ${msg ? `<div class="alert ok">${esc(msg)}</div>` : ''}
-    ${l.statut === 'EKAT' ? `<div class="alert err">⚠ Alèt ekat : voye ${gal(l.kantite_voye)}, resevwa ${gal(l.kantite_resevwa)} — ekat ${gal(l.ekat)} (tolerans ${gal(l.tolerans)}). Direksyon an resevwa notifikasyon an.</div>` : ''}
-    ${l.statut === 'FEMEN' ? `<div class="alert ok">✓ Livrezon fèmen. Stock ${esc(l.station_nom)} mete ajou (+${gal(l.kantite_resevwa)}).</div>` : ''}
+    ${l.statut === 'EKAT' ? `<div class="alert err">⚠ Alèt ekat : voye ${gal(l.kantite_voye)}, resevwa ${gal(l.kantite_resevwa)} — ekat ${gal(l.ekat)}. Direksyon an resevwa notifikasyon an.</div>` : ''}
+    ${l.statut === 'FEMEN' ? `<div class="alert ok">✓ Stock ${esc(l.station_nom)} mete ajou (+${gal(l.kantite_resevwa)}).</div>` : ''}
     ${l.statut === 'REJTE' || l.statut === 'ANILE' ? `<div class="alert err">${ST[l.statut]} : ${esc(l.motif || '')}</div>` : ''}
+    <div class="hero">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="hi">⛽ ${esc(l.produit_nom)}</span>${badge(l.statut)}</div>
+      <div class="big" style="margin-top:6px">${gal(l.kantite_resevwa ?? l.kantite_voye)}</div>
+      <div class="hi">${l.kantite_resevwa != null ? 'resevwa · voye ' + gal(l.kantite_voye) : 'voye'}</div>
+    </div>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0">${esc(l.produit_nom)}</h2>${badge(l.statut)}</div>
-      <div class="big">${gal(l.kantite_voye)}</div>
-      <dl class="kv" style="margin-top:12px">
-        ${kv('Estasyon', esc(l.station_nom))}${kv('Dat & lè', dt(l.date_livrezon))}${kv('No bon', esc(l.no_bon))}
-        ${kv('Kontre-plen', esc(l.no_kontre_plen || '—'))}${kv('Konpayi', esc(l.konpayi))}
-        ${kv('Pri / galon', l.pri_galon == null ? '—' : Number(l.pri_galon).toLocaleString('fr-FR') + ' G')}
-        ${kv('Chofè', esc(l.chofe))}${kv('Telefòn', `<a href="tel:${esc(l.telefon_chofe)}">${esc(l.telefon_chofe)}</a>`)}
+      <dl class="kv">
+        ${kv('Estasyon', esc(l.station_nom))}${kv('Dat & lè', dt(l.resevwa_at || l.date_livrezon))}
+        ${kv('Kontre plen', esc(l.no_kontre_plen || '—'))}${kv('Konpayi', esc(l.konpayi))}${kv('No bon', esc(l.no_bon))}
+        ${kv('Chofè', esc(l.chofe))}${kv('Telefòn', `<a href="tel:${esc(l.telefon_chofe)}" style="color:var(--pri)">${esc(l.telefon_chofe)}</a>`)}
         ${kv('Plak', esc(l.plak_kamyon))}${l.komante ? kv('Kòmantè', esc(l.komante)) : ''}
-        ${l.kantite_resevwa != null ? kv('Resevwa', gal(l.kantite_resevwa)) + kv('Jòj avan / apre', gal(l.jog_avan) + ' / ' + gal(l.jog_apre)) + kv('Ekat', gal(l.ekat)) + kv('Resevwa pa', esc(l.resevwa_par || '—') + ' · ' + dt(l.resevwa_at)) : ''}
+        ${l.kantite_resevwa != null ? kv('Ekat', gal(l.ekat)) + kv('Resevwa pa', esc(l.resevwa_par || '—')) : ''}
       </dl>
     </div>
     ${attend ? `<div class="card" id="rec">
-      <h2>🛢 Konfime resepsyon an</h2>
+      <div class="sec-t"><span class="n">🛢</span>Konfime resepsyon an</div>
       <div class="muted small">Lè kamyon an fin vide nan tank lan. Stock ${esc(l.station_nom)} ap mete ajou otomatikman.</div>
       <div id="f-kantite_resevwa"><label for="r-q">Kantite resevwa (galon)</label>
-        <input id="r-q" type="number" inputmode="decimal" step="0.001" min="0" value="${l.kantite_voye}"><div class="ferr"></div></div>
+        <input id="r-q" type="number" inputmode="decimal" step="0.001" min="0" value="${l.kantite_voye}" style="font-size:20px;font-weight:800"><div class="ferr"></div></div>
       <div class="row">
-        <div><label for="r-a">Jòj tank avan <span class="opt">(gal)</span></label><input id="r-a" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
-        <div><label for="r-p">Jòj tank apre <span class="opt">(gal)</span></label><input id="r-p" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
+        <div><label for="r-a">Jòj avan <span class="opt">(gal)</span></label><input id="r-a" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
+        <div><label for="r-p">Jòj apre <span class="opt">(gal)</span></label><input id="r-p" type="number" inputmode="decimal" step="0.001" min="0" oninput="calcJog()"></div>
       </div>
       <div id="jog-info" class="small muted" style="margin-top:6px"></div>
       <label for="r-c">Kòmantè <span class="opt">(opsyonèl)</span></label><textarea id="r-c" rows="2"></textarea>
-      <div style="height:12px"></div>
+      <div style="height:14px"></div>
       <button class="btn" id="b-rec" onclick="recevoir(${l.id}, ${l.kantite_voye}, ${l.tolerans})">✓ Konfime resepsyon</button>
     </div>` : ''}
-    <a class="btn out" style="text-align:center;text-decoration:none;margin-bottom:14px" href="/api/resepsyon/livrezon/${l.id}/pdf" target="_blank" rel="noopener">📄 Fèy PDF livrezon an</a>
-    <div class="card"><h2>Jounal</h2>${(l.jounal || []).map(j => `<div class="jl"><b>${esc(j.aksyon)}</b> ${j.nouvo_statut ? badge(j.nouvo_statut) : ''}
-      <div class="muted">${dt(j.at)} · ${esc(j.itilizate || '—')}</div></div>`).join('') || '<div class="muted">—</div>'}</div>`, true);
+    ${l.kantite_resevwa != null ? `<a class="btn ghost" style="margin-bottom:14px" href="/api/resepsyon/livrezon/${l.id}/pdf" target="_blank" rel="noopener">📄 Fèy PDF livrezon an</a>` : ''}
+    <div class="card"><div class="sec-t" style="margin-bottom:10px">Jounal</div>${(l.jounal || []).map(j => `<div class="jl"><b>${esc(j.aksyon)}</b> ${j.nouvo_statut ? badge(j.nouvo_statut) : ''}
+      <div class="muted small">${dt(j.at)} · ${esc(j.itilizate || '—')}</div></div>`).join('') || '<div class="muted">—</div>'}</div>`, true);
 }
 function calcJog(){
   const a = Number($('#r-a').value), p = Number($('#r-p').value), z = $('#jog-info');
   if($('#r-a').value && $('#r-p').value){
     if(p < a){ z.textContent = 'Jòj apre a dwe pi wo pase jòj avan an.'; z.style.color = 'var(--err)'; return; }
-    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(p - a)}</b> <a href="#" onclick="$('#r-q').value=${(p - a).toFixed(3)};return false">→ itilize l kòm kantite resevwa</a>`;
+    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(p - a)}</b> <a href="#" style="color:var(--pri)" onclick="$('#r-q').value=${(p - a).toFixed(3)};return false">→ itilize l kòm kantite resevwa</a>`;
   } else z.textContent = '';
 }
 async function recevoir(id, voye, tol){

@@ -329,7 +329,7 @@ def _parse_date(v: Optional[str]) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None) -> dict:
+def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: bool = False) -> dict:
     """Règles de validation du diagramme. Lève 422 avec la liste des erreurs
     (chan = champ du formulaire) pour que l'application les montre."""
     erreurs = []
@@ -372,6 +372,8 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None) -> dict
             err(chan, f"Twò long (maks {n} karaktè).")
     if data.get("no_kontre_plen") is not None:
         data["no_kontre_plen"] = data["no_kontre_plen"].strip()[:60] or None
+    if kreye and not data.get("no_kontre_plen"):
+        err("no_kontre_plen", "Kontre plen obligatwa.")
     if data.get("komante") is not None:
         data["komante"] = data["komante"].strip()[:1000] or None
     if data.get("plak_kamyon"):
@@ -653,10 +655,10 @@ def kreye(data: LivrezonIn, request: Request, u: Utilisateur = Depends(_require_
           udb: Session = Depends(get_db)):
     with session_principale() as db:
         acteur = _Acteur(udb, u)
-        v = _verifier(db, data.model_dump())
+        v = _verifier(db, data.model_dump(), kreye=True)
         l = LivrezonKabiran(
             numero=_prochain_numero(db), station_id=v["station_id"], station_nom=v["station_nom"],
-            produit_id=v["produit_id"], produit_nom=v["produit_nom"], date_livrezon=_parse_date(v["date_livrezon"]),
+            produit_id=v["produit_id"], produit_nom=v["produit_nom"], date_livrezon=datetime.now(timezone.utc),  # dat & lè otomatik
             no_kontre_plen=v["no_kontre_plen"], no_bon=v["no_bon"], no_bon_norm=v["no_bon_norm"],
             kantite_voye=v["kantite_voye"], pri_galon=v["pri_galon"], chofe=v["chofe"],
             telefon_chofe=v["telefon_chofe"], plak_kamyon=v["plak_kamyon"], konpayi=v["konpayi"],
@@ -803,63 +805,23 @@ def pdf_livrezon(d: dict) -> bytes:
     def g(x):
         return "—" if x is None else f"{x:,.3f}".replace(",", " ").rstrip("0").rstrip(".") + " gal"
 
-    fiche = _fiche_station(d["station_id"])
     nom_site = os.getenv("BRANDING_NOM", "").strip() or "Konekta"
-    el = [Paragraph(f"Fich livrezon kabiran — {d['numero']}", h1),
-          Paragraph(f"{nom_site} · {d['station_nom']}" + (f" · {fiche['adresse']}" if fiche.get("adresse") else "")
-                    + (f" · Tél. {fiche['telephone']}" if fiche.get("telephone") else ""), pt),
-          Spacer(1, 6)]
-    couleur = {"FEMEN": "#15803d", "EKAT": "#b91c1c", "REJTE": "#b91c1c", "ANILE": "#64748b"}.get(d["statut"], "#b45309")
-    el.append(Paragraph(f'<font color="{couleur}"><b>Stati : {d["statut_label"]}</b></font>', nor))
-
-    def tableau(rows, larg=(6 * cm, 11.4 * cm)):
-        t = Table([[Paragraph(f"<b>{k}</b>", nor), Paragraph(str(v if v not in (None, "") else "—"), nor)]
-                   for k, v in rows], colWidths=larg)
-        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
-                               ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f1f5f9")),
-                               ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                               ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
-        return t
-
-    el += [Paragraph("Livrezon", h2), tableau([
-        ("Estasyon", d["station_nom"]), ("Kabiran", d["produit_nom"]), ("Dat & lè", fmt_dt(d["date_livrezon"])),
-        ("No bon livrezon", d["no_bon"]), ("No kontre-plen", d["no_kontre_plen"]),
-        ("Kantite voye", g(d["kantite_voye"])),
-        ("Pri pa galon", f"{d['pri_galon']:,.2f} G".replace(",", " ") if d["pri_galon"] is not None else None),
-        ("Konpayi", d["konpayi"]), ("Chofè", d["chofe"]), ("Telefòn chofè", d["telefon_chofe"]),
-        ("Plak kamyon", d["plak_kamyon"]), ("Kòmantè", d["komante"]),
-        ("Anrejistre pa", f"{d['cree_par'] or '—'} · {fmt_dt(d['created_at'])}"),
-    ])]
-    if d["revize_at"]:
-        el += [Paragraph("Revizyon admin", h2),
-               tableau([("Pa", d["revize_par"]), ("Lè", fmt_dt(d["revize_at"])), ("Motif", d["motif"])])]
-    if d["kantite_resevwa"] is not None:
-        ekat = d["ekat"] or 0
-        el += [Paragraph("Resepsyon nan estasyon", h2), tableau([
-            ("Kantite resevwa", g(d["kantite_resevwa"])), ("Jòj tank avan", g(d["jog_avan"])),
-            ("Jòj tank apre", g(d["jog_apre"])),
-            ("Diferans jòj", g(d["jog_apre"] - d["jog_avan"]) if d["jog_avan"] is not None and d["jog_apre"] is not None else None),
-            ("Ekat (voye − resevwa)", f"{g(ekat)}  (tolerans {g(d['tolerans'])})"
-             + ("  — ALÈT EKAT" if d["statut"] == "EKAT" else "  — OK")),
-            ("Resevwa pa", f"{d['resevwa_par'] or '—'} · {fmt_dt(d['resevwa_at'])}"),
-            ("Kòmantè resepsyon", d["komante_resepsyon"]),
-            ("Stock estasyon", f"Livraison #{d['livraison_id']} ajoute nan stock {d['station_nom']}"
-             if d["livraison_id"] else None),
-        ])]
-    if d.get("jounal"):
-        el.append(Paragraph("Jounal odit", h2))
-        rows = [["Lè", "Aksyon", "Stati", "Pa"]] + [
-            [fmt_dt(j["at"]), j["aksyon"], f"{j['ansyen_statut'] or '—'} → {j['nouvo_statut'] or '—'}", j["itilizate"] or "—"]
-            for j in d["jounal"]]
-        t = Table(rows, colWidths=(3.6 * cm, 3.4 * cm, 5.2 * cm, 5.2 * cm))
-        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
-                               ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
-                               ("FONTSIZE", (0, 0), (-1, -1), 8.5)]))
-        el.append(t)
-    el += [Spacer(1, 30), Table([["_____________________________", "_____________________________"],
-                                 ["Siyati chofè", "Siyati jesyonè estasyon"]], colWidths=(8.7 * cm, 8.7 * cm)),
-           Spacer(1, 12),
-           Paragraph(f"Dokiman jenere pa Konekta le {now_haiti().strftime('%d/%m/%Y à %H:%M')}.", pt)]
+    lignes = [
+        ("Estasyon", d["station_nom"]),
+        ("Tip kabiran", d["produit_nom"]),
+        ("Dat & lè", fmt_dt(d["resevwa_at"] or d["date_livrezon"])),
+        ("Kontre plen", d["no_kontre_plen"]),
+        ("Konpayi", d["konpayi"]),
+        ("Kantite resevwa", g(d["kantite_resevwa"])),
+    ]
+    big = ParagraphStyle("big", parent=nor, fontSize=13, leading=17)
+    t = Table([[Paragraph(f"<b>{k}</b>", big), Paragraph(str(v if v not in (None, "") else "—"), big)] for k, v in lignes],
+              colWidths=(6 * cm, 11.4 * cm))
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                           ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f0fdfa")),
+                           ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                           ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
+    el = [Paragraph("Fich livrezon kabiran", h1), Paragraph(nom_site, pt), Spacer(1, 14), t]
     doc.build(el)
     return buf.getvalue()
 
@@ -1023,77 +985,41 @@ def modifye(lid: int, data: LivrezonPatch, request: Request, u: Utilisateur = De
 @router.get("/api/livrezon-admin/dashboard")
 def dashboard(debut: Optional[str] = None, fin: Optional[str] = None, station_id: Optional[int] = None,
               _u: Utilisateur = Depends(_require_superviseur)):
-    """Tableau de bord : gaz entré (reçu), commandes en cours, écarts,
-    répartition par jour / produit / station / compagnie, stock des stations."""
+    """Tableau de bord d'UNE station (jamais de cumul entre stations) :
+    chaque arrivée de camion, commandes en cours, écarts, stock de la station."""
+    toutes = _stations()
+    if station_id is None or not any(s["id"] == station_id for s in toutes):
+        station_id = toutes[0]["id"] if toutes else 0
+    st_nom = next((s["nom"] for s in toutes if s["id"] == station_id), "")
     d, f, a, b = _periode(debut, fin)
     with session_principale() as db:
-        x = db.query(LivrezonKabiran).filter(LivrezonKabiran.date_livrezon >= a, LivrezonKabiran.date_livrezon < b)
-        if station_id is not None:
-            x = x.filter(LivrezonKabiran.station_id == station_id)
-        rows = x.all()
-        en_kou_tout = db.query(LivrezonKabiran).filter(LivrezonKabiran.statut.in_(EN_KOU))
-        if station_id is not None:
-            en_kou_tout = en_kou_tout.filter(LivrezonKabiran.station_id == station_id)
-        en_kou_tout = en_kou_tout.order_by(LivrezonKabiran.date_livrezon).all()
+        base = db.query(LivrezonKabiran).filter(LivrezonKabiran.station_id == station_id)
+        rows = base.filter(LivrezonKabiran.date_livrezon >= a, LivrezonKabiran.date_livrezon < b).all()
+        en_kou = base.filter(LivrezonKabiran.statut.in_(EN_KOU)).order_by(LivrezonKabiran.date_livrezon).all()
         recus = [l for l in rows if l.statut in ("RESEVWA", "FEMEN", "EKAT")]
-
-        def jour(l):
-            dt = l.resevwa_at or l.date_livrezon
-            dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(HAITI_TZ).date().isoformat()
-
-        jours = [(d + timedelta(days=i)).isoformat() for i in range((f - d).days + 1)]
-        produits = sorted({l.produit_nom for l in recus})
-        par_jour = {p: {j: 0.0 for j in jours} for p in produits}
-        for l in recus:
-            j = jour(l)
-            if j in par_jour[l.produit_nom]:
-                par_jour[l.produit_nom][j] += float(l.kantite_resevwa)
-
-        def agreger(cle):
-            acc = {}
-            for l in recus:
-                k = cle(l)
-                e = acc.setdefault(k, {"non": k, "galon": 0.0, "kantite": 0, "valeur": 0.0})
-                e["galon"] += float(l.kantite_resevwa)
-                e["kantite"] += 1
-                e["valeur"] += float(l.kantite_resevwa) * float(l.pri_galon or 0)
-            return sorted(({**e, "galon": round(e["galon"], 3), "valeur": round(e["valeur"], 2)} for e in acc.values()),
-                          key=lambda e: -e["galon"])
-
+        recus.sort(key=lambda l: (l.resevwa_at or l.date_livrezon).replace(tzinfo=None), reverse=True)
         statuts = {s: 0 for s in STATUTS}
         for l in rows:
             statuts[l.statut] += 1
-        total_voye = sum(float(l.kantite_voye) for l in recus)
-        total_resevwa = sum(float(l.kantite_resevwa) for l in recus)
-        ekat_rows = [l for l in rows if l.statut == "EKAT"]
+        ekat_rows = [l for l in recus if l.statut == "EKAT"]
+        arrivees = [livrezon_dict(l) for l in recus]
         kpi = {
-            "galon_resevwa": round(total_resevwa, 3), "galon_voye": round(total_voye, 3),
-            "ekat_total": round(total_voye - total_resevwa, 3),
-            "nb_resevwa": len(recus), "nb_total": len(rows), "nb_en_kou": len(en_kou_tout),
-            "galon_en_kou": round(sum(float(l.kantite_voye) for l in en_kou_tout), 3),
+            "nb_kamyon": len(recus),
+            "dernye_arive": arrivees[0]["resevwa_at"] if arrivees else None,
+            "nb_en_kou": len(en_kou),
             "nb_ekat": len(ekat_rows),
-            "valeur": round(sum(float(l.kantite_resevwa) * float(l.pri_galon or 0) for l in recus), 2),
         }
-        en_kou_d = [livrezon_dict(l) for l in en_kou_tout]
-        ekat_d = [livrezon_dict(l) for l in sorted(ekat_rows, key=lambda l: l.date_livrezon, reverse=True)]
-        par_produit, par_station, par_konpayi = (agreger(lambda l: l.produit_nom), agreger(lambda l: l.station_nom),
-                                                 agreger(lambda l: l.konpayi))
-    stock = []
-    for st in _stations():
-        if station_id is not None and st["id"] != station_id:
-            continue
-        try:
-            stock.append({"station_id": st["id"], "station_nom": st["nom"], "produits": _produits_station(st["id"], True)})
-        except Exception:
-            log.exception("stock station %s", st["id"])
+        en_kou_d = [livrezon_dict(l) for l in en_kou]
+        ekat_d = [livrezon_dict(l) for l in ekat_rows]
+    try:
+        stock = _produits_station(station_id, True)
+    except Exception:
+        log.exception("stock station %s", station_id)
+        stock = []
     return {
-        "debut": d.isoformat(), "fin": f.isoformat(), "kpi": kpi, "statuts": statuts,
-        "jours": jours, "par_jour": [{"produit": p, "valeurs": [round(par_jour[p][j], 3) for j in jours]} for p in produits],
-        "par_produit": par_produit, "par_station": par_station, "par_konpayi": par_konpayi,
-        "en_kou": en_kou_d, "ekat": ekat_d,
-        "stock": stock,
-        "stations": [{"id": s["id"], "nom": s["nom"]} for s in _stations()],
+        "debut": d.isoformat(), "fin": f.isoformat(), "station_id": station_id, "station_nom": st_nom,
+        "kpi": kpi, "statuts": statuts, "arrivees": arrivees, "en_kou": en_kou_d, "ekat": ekat_d,
+        "stock": stock, "stations": [{"id": s["id"], "nom": s["nom"]} for s in toutes],
     }
 
 

@@ -42274,7 +42274,7 @@ function _lvkFiltres(avecRecherche){
   return `<div class="lvk-filtres">
     <label>Du <input type="date" value="${LVK.debut}" onchange="LVK.debut=this.value;lvkOnglet(LVK.onglet)"></label>
     <label>Au <input type="date" value="${LVK.fin}" onchange="LVK.fin=this.value;lvkOnglet(LVK.onglet)"></label>
-    <label>Station <select onchange="LVK.station=this.value;lvkOnglet(LVK.onglet)"><option value="">Toutes</option>
+    <label>Station <select onchange="LVK.station=this.value;lvkOnglet(LVK.onglet)">
       ${(LVK.stations || []).map(s => `<option value="${s.id}" ${String(s.id) === String(LVK.station) ? 'selected' : ''}>${_lvkE(s.nom)}</option>`).join('')}</select></label>
     ${avecRecherche ? `<label>Statut <select onchange="LVK.filtre=this.value;lvkOnglet('liste')"><option value="">Tous</option>
       ${Object.keys(_lvkST).map(s => `<option value="${s}" ${LVK.filtre === s ? 'selected' : ''}>${_lvkST[s]}</option>`).join('')}</select></label>
@@ -42292,51 +42292,62 @@ function _lvkQs(){
 async function lvkDashboard(){
   const d = await GET('/livrezon-admin/dashboard?' + _lvkQs());
   LVK.stations = d.stations;
+  LVK.station = String(d.station_id);
   if(!LVK.debut) LVK.debut = d.debut;
   if(!LVK.fin) LVK.fin = d.fin;
   const k = d.kpi, c = document.getElementById('lvk-contenu');
   const tuile = (l, v, s, col) => `<div class="lvk-kpi" style="--c:${col}"><div class="lvk-kl">${l}</div><div class="lvk-kv">${v}</div><div class="psp-muted">${s}</div></div>`;
   const ligne = l => `<tr onclick="lvkDetail(${l.id})" style="cursor:pointer"><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.date_livrezon)}</td>
-    <td>${_lvkE(l.station_nom)}</td><td>${_lvkE(l.produit_nom)}</td><td class="r">${_lvkG(l.kantite_voye)}</td>
+    <td>${_lvkE(l.produit_nom)}</td><td class="r">${_lvkG(l.kantite_voye)}</td>
     <td>${_lvkE(l.konpayi)}</td><td>${_lvkE(l.plak_kamyon)}</td><td>${_lvkB(l.statut)}</td></tr>`;
-  const tete = '<tr><th>N°</th><th>Date</th><th>Station</th><th>Produit</th><th class="r">Gallons</th><th>Compagnie</th><th>Camion</th><th>Statut</th></tr>';
-  const repart = (titre, rows) => `<div class="psp-card"><div class="psp-head"><b>${titre}</b></div>${rows.length ? `<table class="psp-tbl">
-      <tr><th></th><th class="r">Gallons reçus</th><th class="r">Livraisons</th><th class="r">Valeur (G)</th></tr>
-      ${rows.map(r => `<tr><td>${_lvkE(r.non)}</td><td class="r">${_lvkG(r.galon)}</td><td class="r">${r.kantite}</td>
-      <td class="r">${r.valeur ? Number(r.valeur).toLocaleString('fr-FR', {maximumFractionDigits: 0}) : '—'}</td></tr>`).join('')}</table>`
-      : '<div class="psp-muted">Aucune livraison reçue sur la période.</div>'}</div>`;
+  const tete = '<tr><th>N°</th><th>Date</th><th>Produit</th><th class="r">Gallons</th><th>Compagnie</th><th>Camion</th><th>Statut</th></tr>';
   c.innerHTML = `${_lvkFiltres(false)}
+    <h3 style="margin:0 0 12px">⛽ ${_lvkE(d.station_nom)}</h3>
     <div class="lvk-kpis">
-      ${tuile('Gaz entré (reçu)', _lvkG(k.galon_resevwa), `${k.nb_resevwa} livraison(s) reçue(s)`, '#22c55e')}
-      ${tuile('Commandes en cours', k.nb_en_kou, `${_lvkG(k.galon_en_kou)} attendus`, '#f59e0b')}
-      ${tuile('Écarts (alertes)', k.nb_ekat, `envoyé − reçu : ${_lvkG(k.ekat_total)}`, k.nb_ekat ? '#ef4444' : '#7a9bbb')}
-      ${tuile('Valeur reçue', k.valeur ? Number(k.valeur).toLocaleString('fr-FR', {maximumFractionDigits: 0}) + ' G' : '—', 'gallons reçus × prix / gallon', '#3b82f6')}
+      ${tuile('Camions arrivés', k.nb_kamyon, `${frDate(d.debut)} → ${frDate(d.fin)}`, '#22c55e')}
+      ${tuile('Dernière arrivée', k.dernye_arive ? _lvkDt(k.dernye_arive) : '—', 'dernier camion reçu', '#0f766e')}
+      ${tuile('Commandes en cours', k.nb_en_kou, 'camions attendus', '#f59e0b')}
+      ${tuile('Écarts (alertes)', k.nb_ekat, 'envoyé ≠ reçu', k.nb_ekat ? '#ef4444' : '#7a9bbb')}
     </div>
     <div class="lvk-grid2">
-      <div class="psp-card"><div class="psp-head"><b>Gallons reçus par jour</b><span class="psp-muted">${frDate(d.debut)} → ${frDate(d.fin)}</span></div>
-        <div style="height:260px"><canvas id="lvk-ch-jour"></canvas></div></div>
+      <div class="psp-card"><div class="psp-head"><b>Arrivées des camions</b><span class="psp-muted">une barre = un camion</span></div>
+        <div style="height:260px">${d.arrivees.length ? '<canvas id="lvk-ch-jour"></canvas>' : '<div class="psp-muted">Aucun camion reçu sur la période.</div>'}</div></div>
       <div class="psp-card"><div class="psp-head"><b>Statut des livraisons</b></div><div style="height:260px"><canvas id="lvk-ch-statut"></canvas></div></div>
     </div>
+    <div class="psp-card"><div class="psp-head"><b>🚛 Camions arrivés</b><span class="psp-muted">${d.arrivees.length} camion(s)</span></div>
+      ${d.arrivees.length ? `<div style="overflow-x:auto"><table class="psp-tbl"><tr><th>Arrivé le</th><th>Produit</th><th>Kontre plen</th><th>Compagnie</th><th>Camion</th><th>Chauffeur</th>
+        <th class="r">Envoyé</th><th class="r">Reçu</th><th>Statut</th><th></th></tr>
+        ${d.arrivees.map(l => `<tr><td>${_lvkDt(l.resevwa_at)}</td><td>${_lvkE(l.produit_nom)}</td><td>${_lvkE(l.no_kontre_plen || '—')}</td>
+          <td>${_lvkE(l.konpayi)}</td><td>${_lvkE(l.plak_kamyon)}</td><td>${_lvkE(l.chofe)}</td>
+          <td class="r">${_lvkG(l.kantite_voye)}</td><td class="r"><b>${_lvkG(l.kantite_resevwa)}</b></td><td>${_lvkB(l.statut)}</td>
+          <td style="white-space:nowrap"><button class="psp-tab" onclick="lvkDetail(${l.id})">Voir</button>
+          <a class="psp-tab" style="text-decoration:none" href="/api/livrezon-admin/livrezon/${l.id}/pdf" target="_blank">PDF</a></td></tr>`).join('')}</table></div>`
+        : '<div class="psp-muted">Aucun camion reçu sur la période.</div>'}</div>
     <div class="psp-card"><div class="psp-head"><b>🚚 Commandes en cours (à recevoir)</b><span class="psp-muted">toutes dates</span></div>
       ${d.en_kou.length ? `<div style="overflow-x:auto"><table class="psp-tbl">${tete}${d.en_kou.map(ligne).join('')}</table></div>` : '<div class="psp-muted">Aucune commande en attente.</div>'}</div>
     ${d.ekat.length ? `<div class="psp-card" style="border-color:rgba(239,68,68,.5)"><div class="psp-head"><b style="color:var(--red2)">⚠ Livraisons en écart</b></div>
-      <div style="overflow-x:auto"><table class="psp-tbl"><tr><th>N°</th><th>Date</th><th>Station</th><th>Produit</th><th class="r">Envoyé</th><th class="r">Reçu</th><th class="r">Écart</th><th></th></tr>
-      ${d.ekat.map(l => `<tr><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.resevwa_at)}</td><td>${_lvkE(l.station_nom)}</td><td>${_lvkE(l.produit_nom)}</td>
+      <div style="overflow-x:auto"><table class="psp-tbl"><tr><th>N°</th><th>Arrivé le</th><th>Produit</th><th class="r">Envoyé</th><th class="r">Reçu</th><th class="r">Écart</th><th></th></tr>
+      ${d.ekat.map(l => `<tr><td>${_lvkE(l.numero)}</td><td>${_lvkDt(l.resevwa_at)}</td><td>${_lvkE(l.produit_nom)}</td>
         <td class="r">${_lvkG(l.kantite_voye)}</td><td class="r">${_lvkG(l.kantite_resevwa)}</td><td class="r" style="color:var(--red2)">${_lvkG(l.ekat)}</td>
         <td><button class="psp-tab" onclick="lvkDetail(${l.id})">Voir</button></td></tr>`).join('')}</table></div></div>` : ''}
-    <div class="lvk-grid3">${repart('Par produit', d.par_produit)}${repart('Par station', d.par_station)}${repart('Par compagnie', d.par_konpayi)}</div>
-    <div class="psp-card"><div class="psp-head"><b>🛢 Stock actuel des stations</b><span class="psp-muted">mis à jour à chaque réception</span></div>
-      <div class="lvk-grid3">${d.stock.map(s => `<div class="lvk-stock"><b>${_lvkE(s.station_nom)}</b>${s.produits.map(p => `<div class="lvk-sl">
-        <span>${_lvkE(p.nom)}</span><span style="color:${p.alerte_bas ? 'var(--red2)' : 'var(--text)'}">${_lvkG(p.stock)}${p.jours_de_stock != null ? ` · ${p.jours_de_stock} j` : ''}</span></div>`).join('')
-        || '<div class="psp-muted">Aucun produit</div>'}</div>`).join('')}</div></div>`;
+    <div class="psp-card"><div class="psp-head"><b>🛢 Stock actuel — ${_lvkE(d.station_nom)}</b><span class="psp-muted">mis à jour à chaque réception</span></div>
+      <div class="lvk-grid3">${d.stock.map(p => `<div class="lvk-stock"><b>${_lvkE(p.nom)}</b><div class="lvk-sl"><span>Stock</span>
+        <span style="color:${p.alerte_bas ? 'var(--red2)' : 'var(--text)'}">${_lvkG(p.stock)}${p.jours_de_stock != null ? ` · ${p.jours_de_stock} j` : ''}</span></div></div>`).join('')
+        || '<div class="psp-muted">Aucun produit</div>'}</div></div>`;
   Object.values(LVK.charts).forEach(ch => { try{ ch.destroy(); }catch(_){} });
   LVK.charts = {};
   if(typeof Chart === 'undefined') return;
   const pal = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
-  LVK.charts.jour = new Chart(document.getElementById('lvk-ch-jour'), {type: 'bar',
-    data: {labels: d.jours.map(j => j.slice(8, 10) + '/' + j.slice(5, 7)),
-           datasets: d.par_jour.map((s, i) => ({label: s.produit, data: s.valeurs, backgroundColor: pal[i % pal.length], borderRadius: 4}))},
-    options: {maintainAspectRatio: false, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true}}, plugins: {legend: {position: 'bottom'}}}});
+  if(d.arrivees.length){
+    const arr = d.arrivees.slice().reverse();
+    const prods = [...new Set(arr.map(l => l.produit_nom))];
+    LVK.charts.jour = new Chart(document.getElementById('lvk-ch-jour'), {type: 'bar',
+      data: {labels: arr.map(l => _lvkDt(l.resevwa_at)),
+             datasets: prods.map((p, i) => ({label: p, data: arr.map(l => l.produit_nom === p ? l.kantite_resevwa : null),
+               backgroundColor: pal[i % pal.length], borderRadius: 4}))},
+      options: {maintainAspectRatio: false, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true, title: {display: true, text: 'gallons reçus'}}},
+        plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {afterLabel: ctx => { const l = arr[ctx.dataIndex]; return `${l.konpayi} · ${l.plak_kamyon}`; }}}}}});
+  }
   const st = Object.entries(d.statuts).filter(([, n]) => n > 0);
   LVK.charts.statut = new Chart(document.getElementById('lvk-ch-statut'), {type: 'doughnut',
     data: {labels: st.map(([s]) => _lvkST[s]), datasets: [{data: st.map(([, n]) => n), backgroundColor: st.map(([s]) => _lvkCol[s])}]},
@@ -42344,7 +42355,7 @@ async function lvkDashboard(){
 }
 
 async function lvkListe(){
-  if(!LVK.stations) LVK.stations = (await GET('/livrezon-admin/dashboard')).stations;
+  if(!LVK.stations || LVK.station === ''){ const d0 = await GET('/livrezon-admin/dashboard?' + _lvkQs()); LVK.stations = d0.stations; LVK.station = String(d0.station_id); }
   const p = _lvkQs();
   if(LVK.filtre) p.set('statut', LVK.filtre);
   if(LVK.q) p.set('q', LVK.q);
