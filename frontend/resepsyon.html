@@ -104,6 +104,20 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box
 .vignettes{display:grid;grid-template-columns:1fr 1fr;gap:10px} .vignettes a{display:block;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#e9eef3}
 .vignettes img{width:100%;height:100%;object-fit:cover;display:block}
 .vide{text-align:center;padding:30px 18px;color:var(--mut)}
+.fich-sec{margin:0 0 4px;font-size:13px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;color:var(--pri)}
+.fich{display:grid;grid-template-columns:minmax(110px,40%) 1fr;margin:6px 0 16px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.fich:last-child{margin-bottom:0}
+.fich dt,.fich dd{margin:0;padding:10px 12px;border-top:1px solid var(--line);font-size:14.5px}
+.fich dt{background:#f0fdfa;color:#475569} .fich dd{font-weight:700;overflow-wrap:anywhere}
+.fich dt:first-of-type,.fich dt:first-of-type+dd{border-top:0}
+.fich dd.fort{color:var(--pri2);font-size:16px}
+.rech{position:relative;margin-bottom:10px} .rech input{padding-left:44px} .rech::before{content:"🔎";position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:16px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none} .chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;color:#475569}
+.chips button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.jou{font-size:13px;font-weight:800;color:var(--mut);margin:14px 4px 8px;text-transform:capitalize}
+.lien{display:block;text-align:center;font-weight:800;color:var(--pri);padding:12px;text-decoration:none}
+.note{font-size:13px;color:var(--mut);text-align:center;margin:-4px 4px 14px}
 .fld,.card{scroll-margin-top:84px;scroll-margin-bottom:110px}
 /* Lè klavye a louvri, bouton an pa kouvri chan an */
 body:has(main input:focus, main textarea:focus) .barre-bas{position:static}
@@ -248,7 +262,8 @@ async function accueil(){
   ecran('Livrezon kabiran', charge);
   const tok = ++navTok;
   let L = [];
-  try{ L = (await api('GET', '/api/resepsyon/livrezon')).livrezons; }
+  let total = 0;
+  try{ const r = await api('GET', '/api/resepsyon/livrezon?limit=100'); L = r.livrezons; total = r.total; }
   catch(e){ if(e.status === 401) return ecranCode(); return ecran('Livrezon kabiran', `<div class="alert err">${esc(e.message)}</div>`); }
   if(tok !== navTok) return;
   const jodi = new Date().toDateString();
@@ -260,12 +275,61 @@ async function accueil(){
         <div><div class="hi">Konekte kòm</div><div class="nm">${esc(moi.nom_complet)}</div><div class="hi">${esc(moi.username)}</div></div>
         <button onclick="accueil()" aria-label="Rafrechi" style="border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:12px;width:42px;height:42px;font-size:18px">↻</button>
       </div>
-      <div class="stats"><div><b>${nJodi}</b><span>kamyon jodi a</span></div><div><b>${bon.length}</b><span>kamyon resevwa</span></div></div>
+      <div class="stats"><div><b>${nJodi}</b><span>kamyon jodi a</span></div><div><b>${total}</b><span>fich nan istorik la</span></div></div>
     </div>
-    <div class="sec-t" style="margin:4px 2px 10px">✅ Gaz resevwa</div>
-    ${L.length ? L.map(item).join('') : `<div class="card vide"><div class="e">🚛</div>Poko gen livrezon resevwa.<br>Peze « Nouvo livrezon » lè yon kamyon gaz rive.</div>`}
+    <button class="btn light" style="margin-bottom:14px" onclick="aller(istorik)">📚 Istorik fich yo</button>
+    <div class="sec-t" style="margin:4px 2px 10px">✅ Dènye livrezon yo</div>
+    ${L.length ? L.slice(0, 5).map(item).join('') + (total > 5 ? `<a href="#" class="lien" onclick="aller(istorik);return false">Wè tout ${total} fich yo →</a>` : '')
+      : `<div class="card vide"><div class="e">🚛</div>Poko gen livrezon resevwa.<br>Peze « Nouvo livrezon » lè yon kamyon gaz rive.</div>`}
     <div style="height:70px"></div>
     <button class="btn fab" onclick="aller(nouveau)">＋ Nouvo livrezon</button>`);
+}
+/* ── Istorik fich yo : tout fich yo rete konsève, rechèch, estasyon, peryòd ── */
+const H = {q: '', station_id: '', per: 'tout', L: [], total: 0};
+const isoJ = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+function periodeH(){
+  const j = new Date();
+  if(H.per === 'jodi') return [isoJ(j), isoJ(j)];
+  if(H.per === '7') return [isoJ(new Date(j.getTime() - 6 * 864e5)), isoJ(j)];
+  if(H.per === 'mwa') return [isoJ(new Date(j.getFullYear(), j.getMonth(), 1)), isoJ(j)];
+  if(H.per === 'mwa1') return [isoJ(new Date(j.getFullYear(), j.getMonth() - 1, 1)), isoJ(new Date(j.getFullYear(), j.getMonth(), 0))];
+  return [null, null];
+}
+async function istorik(){
+  ecran('Istorik fich yo', charge, true);
+  if(!stations.length){ try{ stations = (await api('GET', '/api/resepsyon/stations')).stations; }catch(_){} }
+  const P = [['tout', 'Tout'], ['jodi', 'Jodi a'], ['7', '7 dènye jou'], ['mwa', 'Mwa sa a'], ['mwa1', 'Mwa pase']];
+  ecran('Istorik fich yo', `
+    <div class="rech"><input id="h-q" type="search" placeholder="Chèche : bon, kontre plen, chofè, plak, konpayi…" value="${esc(H.q)}" autocomplete="off"></div>
+    ${stations.length > 1 ? `<div class="sel" style="margin-bottom:10px"><select id="h-st" onchange="H.station_id=this.value;chargerH()">
+      <option value="">Tout estasyon yo</option>${stations.map(x => `<option value="${x.id}" ${String(x.id) === H.station_id ? 'selected' : ''}>${esc(x.nom)}</option>`).join('')}</select></div>` : ''}
+    <div class="chips">${P.map(([k, t]) => `<button class="${H.per === k ? 'on' : ''}" onclick="H.per='${k}';document.querySelectorAll('.chips button').forEach(b=>b.classList.remove('on'));this.classList.add('on');chargerH()">${t}</button>`).join('')}</div>
+    <div id="h-res">${charge}</div>`, true);
+  let t = null;
+  $('#h-q').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { H.q = e.target.value.trim(); chargerH(); }, 350); });
+  chargerH();
+}
+async function chargerH(plus){
+  const z = $('#h-res'); if(!z) return;
+  const [d, f] = periodeH();
+  const qs = new URLSearchParams({limit: 30, offset: plus ? H.L.length : 0});
+  if(H.q) qs.set('q', H.q); if(H.station_id !== '') qs.set('station_id', H.station_id);
+  if(d){ qs.set('debut', d); qs.set('fin', f); }
+  if(!plus) z.innerHTML = charge;
+  let r;
+  try{ r = await api('GET', '/api/resepsyon/livrezon?' + qs); }
+  catch(e){ if(e.status === 401) return ecranCode(); z.innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return; }
+  if(!$('#h-res')) return;
+  H.L = plus ? H.L.concat(r.livrezons) : r.livrezons; H.total = r.total;
+  if(!H.L.length){ z.innerHTML = `<div class="card vide"><div class="e">📭</div>Pa gen fich pou rechèch sa a.</div>`; return; }
+  let jou = '', html = `<div class="muted small" style="margin:2px 4px 4px">${H.total} fich</div>`;
+  for(const l of H.L){
+    const j = new Date(l.resevwa_at || l.date_livrezon).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+    if(j !== jou){ jou = j; html += `<div class="jou">${j}</div>`; }
+    html += item(l);
+  }
+  if(H.L.length < H.total) html += `<button class="btn ghost" style="margin-top:6px" onclick="this.disabled=true;chargerH(true)">Wè plis (${H.total - H.L.length})</button>`;
+  z.innerHTML = html;
 }
 function item(l){
   const ic = {VALIDE: '🚚', AN_WOUT: '🚚', RESEVWA: '✅', FEMEN: '✅', EKAT: '⚠️', REJTE: '⛔', ANILE: '⛔'}[l.statut] || '⛽';
@@ -535,14 +599,11 @@ async function detail(id, msg){
       <div class="big" style="margin-top:6px">${gal(l.kantite_resevwa ?? l.kantite_voye)}</div>
       <div class="hi">${l.kantite_resevwa != null ? 'resevwa · voye ' + gal(l.kantite_voye) : 'voye'}</div>
     </div>
-    <div class="card">
-      <dl class="kv">
-        ${kv('Estasyon', esc(l.station_nom))}${kv('Dat & lè', dt(l.resevwa_at || l.date_livrezon))}
-        ${kv('Kontre plen', esc(l.no_kontre_plen || '—'))}${kv('Konpayi', esc(l.konpayi))}${kv('No bon', esc(l.no_bon))}
-        ${kv('Chofè', esc(l.chofe))}${kv('Telefòn', `<a href="tel:${esc(l.telefon_chofe)}" style="color:var(--pri)">${esc(l.telefon_chofe)}</a>`)}
-        ${kv('Plak', esc(l.plak_kamyon || '—'))}${l.komante ? kv('Kòmantè', esc(l.komante)) : ''}
-        ${l.kantite_resevwa != null ? kv('Ekat', gal(l.ekat)) + kv('Resevwa pa', esc(l.resevwa_par || '—')) : ''}
-      </dl>
+    ${l.kantite_resevwa != null ? `<button class="btn wa" style="margin-bottom:10px" onclick="partagerWA()">${IC_WA} Voye fich la sou WhatsApp</button>
+      <div class="note">Mesaj la + fich PDF la (ak foto yo) ale ansanm.</div>` : ''}
+    <div class="card"><div class="sec-t" style="margin-bottom:12px">📄 Fich livrezon an</div>
+      ${(l.fich || []).map(sc => `<div class="fich-sec">${esc(sc.titre)}</div><dl class="fich">${sc.lignes.map(([k, v]) =>
+        `<dt>${esc(k)}</dt><dd class="${k === 'Kantite resevwa' ? 'fort' : ''}">${k === 'Telefòn chofè' && v !== '—' ? `<a href="tel:${esc(v)}" style="color:var(--pri)">${esc(v)}</a>` : esc(v)}</dd>`).join('')}</dl>`).join('')}
     </div>
     ${(l.fotos || []).length ? `<div class="card"><div class="sec-t" style="margin-bottom:10px">📷 Foto fèy la</div><div class="vignettes">
       ${l.fotos.map(f => `<a href="/api/resepsyon/livrezon/${l.id}/foto/${f.id}" target="_blank" rel="noopener"><img loading="lazy" src="/api/resepsyon/livrezon/${l.id}/foto/${f.id}" alt="${esc(f.nom)}"></a>`).join('')}</div></div>` : ''}
@@ -565,8 +626,9 @@ async function detail(id, msg){
       <div style="height:6px"></div>
       <button class="btn" id="b-rec" onclick="recevoir(${l.id}, ${l.kantite_voye}, ${l.tolerans})">✓ Konfime resepsyon</button>
     </div>` : ''}
-    ${l.kantite_resevwa != null ? `<button class="btn wa" style="margin-bottom:12px" onclick="partagerWA()">${IC_WA} Pataje sou WhatsApp</button>
-      <a class="btn ghost" style="margin-bottom:14px" href="/api/resepsyon/livrezon/${l.id}/pdf" target="_blank" rel="noopener">📄 Fèy PDF livrezon an</a>` : ''}
+    ${l.kantite_resevwa != null ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <a class="btn ghost" style="padding:14px 10px;font-size:15px" href="/api/resepsyon/livrezon/${l.id}/pdf" target="_blank" rel="noopener">📄 Wè PDF la</a>
+      <button class="btn light" style="padding:14px 10px;font-size:15px" onclick="partagerTexte()">💬 Mesaj sèlman</button></div>` : ''}
     <div class="card"><div class="sec-t" style="margin-bottom:10px">Jounal</div>${(l.jounal || []).map(j => `<div class="jl"><b>${esc(j.aksyon)}</b> ${j.nouvo_statut ? badge(j.nouvo_statut) : ''}
       <div class="muted small">${dt(j.at)} · ${esc(j.itilizate || '—')}</div></div>`).join('') || '<div class="muted">—</div>'}</div>`, true);
 }
@@ -574,24 +636,51 @@ async function detail(id, msg){
 const IC_WA = '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2l-.4-.3z"/></svg>';
 let courant = null, pdfBlob = null;
 function texteLivrezon(l){
-  return ['*Fich livrezon kabiran*', '📍 Estasyon : ' + l.station_nom, '⛽ Tip kabiran : ' + l.produit_nom,
-    '🕒 Dat & lè : ' + dt(l.resevwa_at || l.date_livrezon), '🔢 Kontre plen : ' + (l.no_kontre_plen || '—'),
-    '🏢 Konpayi : ' + l.konpayi, '✅ *Kantite resevwa : ' + gal(l.kantite_resevwa) + '*'].join('\n');
+  const out = ['📄 *FICH LIVREZON KABIRAN*', `*${l.numero}* · ${l.station_nom}`, '━━━━━━━━━━━━━━━'];
+  for(const sc of (l.fich || [])){
+    out.push('', `*${sc.titre.toUpperCase()}*`);
+    for(const [k, v] of sc.lignes) out.push(k === 'Kantite resevwa' ? `▪️ ${k} : *${v}*` : `▪️ ${k} : ${v}`);
+  }
+  out.push('', '━━━━━━━━━━━━━━━', '_Fich PDF la (ak foto fèy la) atache._');
+  return out.join('\n');
 }
+async function copier(t){ try{ await navigator.clipboard.writeText(t); return true; }catch(_){ return false; } }
+function toast(m){
+  let z = document.getElementById('toast');
+  if(!z){ z = document.createElement('div'); z.id = 'toast';
+    z.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto;background:#0f172a;color:#fff;border-radius:14px;padding:13px 16px;font-weight:600;font-size:14.5px;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:opacity .3s';
+    document.body.appendChild(z); }
+  z.textContent = m; z.style.opacity = '1'; clearTimeout(z._t); z._t = setTimeout(() => { z.style.opacity = '0'; }, 4500);
+}
+/* Fich PDF la + mesaj la ansanm (WhatsApp mete mesaj la anba dokiman an). Mesaj la kopye tou, pou si telefòn nan pa mete l. */
 async function partagerWA(){
   const l = courant; if(!l) return;
   const texte = texteLivrezon(l);
+  const copie = await copier(texte);
   if(!pdfBlob && navigator.canShare){
     try{ const r = await fetch(`/api/resepsyon/livrezon/${l.id}/pdf`, {credentials: 'same-origin'}); if(r.ok) pdfBlob = await r.blob(); }catch(_){}
   }
   if(pdfBlob && navigator.canShare){
-    const f = new File([pdfBlob], `livrezon-${l.numero}.pdf`, {type: 'application/pdf'});
+    const f = new File([pdfBlob], `fich-livrezon-${l.numero}.pdf`, {type: 'application/pdf'});
     if(navigator.canShare({files: [f]})){
-      try{ await navigator.share({files: [f], text: texte, title: 'Fich livrezon kabiran'}); return; }
+      if(copie) toast('Mesaj la kopye tou : si li pa parèt ak PDF la, kenbe dwèt ou nan WhatsApp epi « Kole ».');
+      try{ await navigator.share({files: [f], text: texte, title: 'Fich livrezon ' + l.numero}); return; }
       catch(e){ if(e.name === 'AbortError') return; }
     }
   }
+  // Telefòn nan pa ka voye fichye : mesaj la ale, PDF la telechaje pou w ka atache l
   window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+  telecharger(l);
+  toast('Mesaj la louvri nan WhatsApp. PDF la telechaje : atache l nan menm konvèsasyon an (📎 → Dokiman).');
+}
+function partagerTexte(){
+  const l = courant; if(!l) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(texteLivrezon(l)), '_blank', 'noopener');
+}
+function telecharger(l){
+  const a = document.createElement('a');
+  a.href = pdfBlob ? URL.createObjectURL(pdfBlob) : `/api/resepsyon/livrezon/${l.id}/pdf`;
+  a.download = `fich-livrezon-${l.numero}.pdf`; document.body.appendChild(a); a.click(); a.remove();
 }
 function calcJog(){
   const a = nb($('#r-a').value), p = nb($('#r-p').value), z = $('#jog-info');

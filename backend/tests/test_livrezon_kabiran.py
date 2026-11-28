@@ -110,7 +110,8 @@ def test_circuit_livrezon(client):
     assert p.post(f"/api/livrezon-admin/livrezon/{r.json()['id']}/anile", json={"motif": "Test type"}).status_code == 200
     # Application : camion arrivé enregistré en une fois (réception + 2 photos de la fiche obligatoires)
     import base64 as b64
-    png = "data:image/png;base64," + b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 50).decode()
+    ico = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "resepsyon-app", "favicon-64.png")
+    png = "data:image/png;base64," + b64.b64encode(open(ico, "rb").read()).decode()
     k = dict(base, no_bon="BL-KONPLE-1", kantite_resevwa=2995, jog_avan=100, jog_apre=3095)
     r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, fotos=[png], kantite_resevwa=None, chofe=""))
     assert r.status_code == 422
@@ -128,6 +129,18 @@ def test_circuit_livrezon(client):
     assert p.get(f"/api/livrezon-admin/livrezon/{kp['id']}/foto/{kp['fotos'][1]['id']}").status_code == 200
     assert rc.get(f"/api/livrezon-admin/livrezon/{kp['id']}/foto/{kp['fotos'][1]['id']}").status_code == 403
     assert rc.get(f"/api/resepsyon/livrezon/{l['id']}/foto/{kp['fotos'][0]['id']}").status_code == 404
+    # Fich konplè : tout sa resepsyon an antre (PDF + mesaj WhatsApp menm kontni), foto yo sou paj 2
+    dk = rc.get(f"/api/resepsyon/livrezon/{kp['id']}").json()
+    fich = {k: v for s in dk["fich"] for k, v in s["lignes"]}
+    assert fich["Kantite resevwa"] == "2 995 gal" and fich["Jòj tank apre"] == "3 095 gal" and fich["Diferans jòj"] == "2 995 gal"
+    assert fich["Kontre plen"] == "KP-9" and fich["Plak kamyon"] == "—" and fich["Foto fèy la"] == "2 foto"
+    r = rc.get(f"/api/resepsyon/livrezon/{kp['id']}/pdf")
+    assert r.status_code == 200 and r.content.count(b"/Type /Page\n") + r.content.count(b"/Type /Page\r") + r.content.count(b"/Type /Page ") >= 2
+    # Istorik : rechèch, estasyon, paj
+    h = rc.get("/api/resepsyon/livrezon", params={"q": "BL-KONPLE"}).json()
+    assert h["total"] == 1 and h["livrezons"][0]["id"] == kp["id"]
+    assert rc.get("/api/resepsyon/livrezon", params={"station_id": eid, "limit": 1}).json()["limit"] == 1
+    assert rc.get("/api/resepsyon/livrezon", params={"station_id": 999999}).json()["total"] == 0
     assert p.post(f"/api/livrezon-admin/livrezon/{kp['id']}/anile", json={"motif": "Test konple"}).status_code == 200
     assert round(_stock(sch, "Diesel")[0] - d_avan, 3) == 0
     # Admin : approuver → en route

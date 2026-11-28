@@ -731,18 +731,33 @@ def kreye(data: LivrezonIn, request: Request, u: Utilisateur = Depends(_require_
 
 
 @router.get("/api/resepsyon/livrezon")
-def mes_livrezons(statut: Optional[str] = None, u: Utilisateur = Depends(_require_resepsyon),
-                  udb: Session = Depends(get_db)):
+def mes_livrezons(statut: Optional[str] = None, q: Optional[str] = None, station_id: Optional[int] = None,
+                  debut: Optional[str] = None, fin: Optional[str] = None, offset: int = 0, limit: int = 100,
+                  u: Utilisateur = Depends(_require_resepsyon), udb: Session = Depends(get_db)):
+    """Istorik fich yo (app) : rechèch, estasyon, peryòd (dat lokal Ayiti), paj."""
     from pompiste_routes import peut_superviser
+    limit, offset = max(1, min(limit, 100)), max(0, offset)
     with session_principale() as db:
-        q = db.query(LivrezonKabiran)
+        x = db.query(LivrezonKabiran)
         if not peut_superviser(u):
             # Ses livraisons + toutes celles qui attendent une réception
-            q = q.filter((LivrezonKabiran.cree_par_id == u.id) | (LivrezonKabiran.statut.in_(EN_KOU)))
+            x = x.filter((LivrezonKabiran.cree_par_id == u.id) | (LivrezonKabiran.statut.in_(EN_KOU)))
         if statut:
-            q = q.filter(LivrezonKabiran.statut.in_([s for s in statut.split(",") if s in STATUTS]))
-        rows = q.order_by(LivrezonKabiran.date_livrezon.desc(), LivrezonKabiran.id.desc()).limit(100).all()
-        return {"livrezons": [livrezon_dict(l) for l in rows]}
+            x = x.filter(LivrezonKabiran.statut.in_([s for s in statut.split(",") if s in STATUTS]))
+        if station_id is not None:
+            x = x.filter(LivrezonKabiran.station_id == station_id)
+        if debut or fin:
+            _d, _f, a, b = _periode(debut, fin)
+            x = x.filter(LivrezonKabiran.date_livrezon >= a, LivrezonKabiran.date_livrezon < b)
+        if q and q.strip():
+            t = f"%{q.strip()}%"
+            x = x.filter(LivrezonKabiran.numero.ilike(t) | LivrezonKabiran.no_bon.ilike(t)
+                         | LivrezonKabiran.no_kontre_plen.ilike(t) | LivrezonKabiran.chofe.ilike(t)
+                         | LivrezonKabiran.plak_kamyon.ilike(t) | LivrezonKabiran.konpayi.ilike(t)
+                         | LivrezonKabiran.produit_nom.ilike(t) | LivrezonKabiran.station_nom.ilike(t))
+        total = x.count()
+        rows = x.order_by(LivrezonKabiran.date_livrezon.desc(), LivrezonKabiran.id.desc()).offset(offset).limit(limit).all()
+        return {"livrezons": [livrezon_dict(l) for l in rows], "total": total, "offset": offset, "limit": limit}
 
 
 def _charger(db: Session, lid: int) -> LivrezonKabiran:
@@ -755,7 +770,9 @@ def _charger(db: Session, lid: int) -> LivrezonKabiran:
 @router.get("/api/resepsyon/livrezon/{lid}")
 def detay(lid: int, _u: Utilisateur = Depends(_require_resepsyon)):
     with session_principale() as db:
-        return livrezon_dict(_charger(db, lid), jounal=True, db=db)
+        d = livrezon_dict(_charger(db, lid), jounal=True, db=db)
+    d["fich"] = [{"titre": t, "lignes": [[k, v] for k, v in l]} for t, l in fiche_sections(d)]   # menm kontni ak PDF la
+    return d
 
 
 def _fini_resepsyon(db: Session, l: LivrezonKabiran, acteur, request: Request) -> None:
@@ -948,41 +965,105 @@ def pdf_livrezon(d: dict) -> bytes:
     h2 = ParagraphStyle("h2", parent=ss["Heading3"], fontSize=11.5, spaceBefore=10, spaceAfter=4,
                         textColor=colors.HexColor("#0f172a"))
 
-    def fmt_dt(s):
-        if not s:
-            return "—"
-        try:
-            return datetime.fromisoformat(s).strftime("%d/%m/%Y %H:%M")
-        except ValueError:
-            return s
+    from xml.sax.saxutils import escape as xesc
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import Image as RLImage, PageBreak
 
     def g(x):
-        return "—" if x is None else f"{x:,.3f}".replace(",", " ").rstrip("0").rstrip(".") + " gal"
+        return "—" if x is None else f"{x:,.3f}".rstrip("0").rstrip(".").replace(",", " ").replace(".", ",") + " gal"
 
     nom_site = os.getenv("BRANDING_NOM", "").strip() or "Konekta"
-    lignes = [
-        ("Estasyon", d["station_nom"]),
-        ("Tip kabiran", d["produit_nom"]),
-        ("Dat & lè", fmt_dt(d["resevwa_at"] or d["date_livrezon"])),
-        ("Kontre plen", d["no_kontre_plen"]),
-        ("Konpayi", d["konpayi"]),
-        ("Kantite resevwa", g(d["kantite_resevwa"])),
-    ]
-    big = ParagraphStyle("big", parent=nor, fontSize=13, leading=17)
-    t = Table([[Paragraph(f"<b>{k}</b>", big), Paragraph(str(v if v not in (None, "") else "—"), big)] for k, v in lignes],
-              colWidths=(6 * cm, 11.4 * cm))
-    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                           ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f0fdfa")),
-                           ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                           ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
-    el = [Paragraph("Fich livrezon kabiran", h1), Paragraph(nom_site, pt), Spacer(1, 14), t]
+    sections = fiche_sections(d)
+    vert, gris = colors.HexColor("#0f766e"), colors.HexColor("#cbd5e1")
+    cle = ParagraphStyle("cle", parent=nor, fontSize=10.5, leading=14, textColor=colors.HexColor("#334155"))
+    val = ParagraphStyle("val", parent=nor, fontSize=11.5, leading=15)
+    sec = ParagraphStyle("sec", parent=h2, textColor=vert)
+    el = [Paragraph("Fich livrezon kabiran", h1),
+          Paragraph(f"{xesc(nom_site)} · Fich {xesc(d['numero'])} · {xesc(d['station_nom'])}", pt), Spacer(1, 6)]
+    # Bann kantite (voye / resevwa / ekat)
+    ekat_txt = g(d["ekat"]) + (" (!)" if d["statut"] == "EKAT" else "")
+    bann = Table([[Paragraph(f"<font size=9 color='#475569'>{k}</font><br/><b><font size=14>{xesc(v)}</font></b>", nor)
+                   for k, v in (("Kantite voye", g(d["kantite_voye"])), ("Kantite resevwa", g(d["kantite_resevwa"])),
+                                ("Ekat", ekat_txt))]], colWidths=(5.8 * cm,) * 3)
+    bann.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.8, vert), ("INNERGRID", (0, 0), (-1, -1), 0.5, gris),
+                              ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#ecfdf5")),
+                              ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#fdecec" if d["statut"] == "EKAT" else "#f8fafc")),
+                              ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
+    el += [Spacer(1, 6), bann]
+    for titre, lignes in sections:
+        t = Table([[Paragraph(xesc(k), cle), Paragraph(xesc(v).replace("\n", "<br/>"), val)] for k, v in lignes],
+                  colWidths=(5.4 * cm, 12 * cm))
+        t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, gris),
+                               ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f0fdfa")),
+                               ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                               ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        el += [Paragraph(xesc(titre), sec), t]
+    el.append(Spacer(1, 10))
+    el.append(Paragraph(f"Fich sa a soti nan {xesc(nom_site)} — enprime {now_haiti().strftime('%d/%m/%Y %H:%M')}.", pt))
+    # Foto fèy la (paj 2)
+    imgs = []
+    for f in d.get("_fotos_brut") or []:
+        try:
+            ir = ImageReader(io.BytesIO(f))
+            w, h = ir.getSize()
+            k = min(8.4 * cm / w, 12.5 * cm / h)
+            imgs.append(RLImage(io.BytesIO(f), width=w * k, height=h * k))
+        except Exception:
+            log.exception("foto fich %s", d.get("numero"))
+    if imgs:
+        el += [PageBreak(), Paragraph("Foto fèy livrezon an", h1), Paragraph(f"Fich {xesc(d['numero'])}", pt), Spacer(1, 10)]
+        rangs = [imgs[i:i + 2] + [""] * (2 - len(imgs[i:i + 2])) for i in range(0, len(imgs), 2)]
+        ti = Table(rangs, colWidths=(8.7 * cm, 8.7 * cm))
+        ti.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 10)]))
+        el.append(ti)
     doc.build(el)
     return buf.getvalue()
+
+
+def dt_haiti(s: Optional[str]) -> str:
+    if not s:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return s
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).astimezone(HAITI_TZ).strftime("%d/%m/%Y %H:%M")
+
+
+def fiche_sections(d: dict) -> list:
+    """Tout sa moun resepsyon an antre — menm lis la pou PDF la ak mesaj WhatsApp la (app la)."""
+    def g(x):
+        return "—" if x is None else f"{x:,.3f}".rstrip("0").rstrip(".").replace(",", " ").replace(".", ",") + " gal"
+
+    def v(x):
+        return "—" if x in (None, "") else str(x)
+
+    jog = None
+    if d.get("jog_avan") is not None and d.get("jog_apre") is not None:
+        jog = round(d["jog_apre"] - d["jog_avan"], 3)
+    return [
+        ("Livrezon", [("Nimewo fich", v(d["numero"])), ("Estasyon", v(d["station_nom"])),
+                      ("Tip kabiran", v(d["produit_nom"])), ("Dat & lè", dt_haiti(d["resevwa_at"] or d["date_livrezon"])),
+                      ("Kontre plen", v(d["no_kontre_plen"])), ("Nimewo bon", v(d["no_bon"])),
+                      ("Konpayi", v(d["konpayi"]))]),
+        ("Kamyon & chofè", [("Chofè", v(d["chofe"])), ("Telefòn chofè", v(d["telefon_chofe"])),
+                            ("Plak kamyon", v(d["plak_kamyon"]))]),
+        ("Resepsyon", [("Kantite voye", g(d["kantite_voye"])), ("Kantite resevwa", g(d["kantite_resevwa"])),
+                       ("Ekat", g(d["ekat"]) + (" (plis pase tolerans)" if d["statut"] == "EKAT" else "")),
+                       ("Jòj tank avan", g(d["jog_avan"])), ("Jòj tank apre", g(d["jog_apre"])),
+                       ("Diferans jòj", g(jog)), ("Estati", v(d["statut_label"]))]),
+        ("Lòt enfòmasyon", [("Kòmantè", v(d["komante"] or d.get("komante_resepsyon"))),
+                            ("Resevwa pa", v(d["resevwa_par"] or d["cree_par"])),
+                            ("Foto fèy la", f"{len(d.get('fotos') or [])} foto")]),
+    ]
 
 
 def _pdf_reponse(lid: int) -> Response:
     with session_principale() as db:
         d = livrezon_dict(_charger(db, lid), jounal=True, db=db)
+        d["_fotos_brut"] = [base64.b64decode(c) for (c,) in db.query(PieceJointe.contenu_base64)
+                            .filter_by(type_entite=TYPE_FOTO, entite_id=lid).order_by(PieceJointe.id).all()]
     return Response(pdf_livrezon(d), media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="livrezon-{d["numero"]}.pdf"',
                              "Cache-Control": "no-store"})
