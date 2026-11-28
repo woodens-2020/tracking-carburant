@@ -314,8 +314,8 @@ class LivrezonIn(BaseModel):
     station_id: int
     produit_id: int
     date_livrezon: Optional[str] = None      # ISO (date + heure) ; vide = maintenant
-    no_kontre_plen: Optional[str] = None
-    no_bon: str
+    no_kontre_plen: Optional[str] = None      # nonb antye (chif sèlman)
+    no_bon: Optional[str] = None              # opsyonèl
     kantite_voye: float
     pri_galon: Optional[float] = None
     chofe: str
@@ -383,7 +383,9 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
     def err(chan, msg):
         erreurs.append({"chan": chan, "message": msg})
 
-    for chan, label in (("no_bon", "No bon livrezon"), ("chofe", "Chofè"), ("telefon_chofe", "Telefòn chofè"),
+    if "no_bon" in data:                          # opsyonèl
+        data["no_bon"] = (data["no_bon"] or "").strip()
+    for chan, label in (("chofe", "Chofè"), ("telefon_chofe", "Telefòn chofè"),
                         ("konpayi", "Konpayi")):
         v = (data.get(chan) or "").strip()
         if not v:
@@ -413,6 +415,8 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
             if dbl:
                 err("no_bon", f"Bon livrezon sa a deja anrejistre ({dbl.numero}, {dbl.station_nom}).")
         data["no_bon_norm"] = n
+    else:
+        data["no_bon_norm"] = None                # pa gen bon : _nouvo mete yon valè inik
     for chan, n in (("chofe", 150), ("plak_kamyon", 30), ("konpayi", 150), ("no_bon", 60)):
         if len(data.get(chan) or "") > n:
             err(chan, f"Twò long (maks {n} karaktè).")
@@ -420,6 +424,12 @@ def _verifier(db: Session, data: dict, exclure_id: Optional[int] = None, kreye: 
         data["no_kontre_plen"] = data["no_kontre_plen"].strip()[:60] or None
     if kreye and not data.get("no_kontre_plen"):
         err("no_kontre_plen", "Kontre plen obligatwa.")
+    elif kreye:
+        k = data["no_kontre_plen"].replace(" ", "")
+        if not re.fullmatch(r"\d{1,9}", k):
+            err("no_kontre_plen", "Kontre plen an dwe yon nonb antye (chif sèlman, egz: 12).")
+        else:
+            data["no_kontre_plen"] = str(int(k))
     if data.get("komante") is not None:
         data["komante"] = data["komante"].strip()[:1000] or None
     if "plak_kamyon" in data:                     # opsyonèl : vide = ""
@@ -457,7 +467,7 @@ def _ecrire_stock(l: LivrezonKabiran) -> int:
             d = ra.astimezone(HAITI_TZ).date()
         lv = Livraison(produit_id=l.produit_id, date_livraison=d, gallons_recus=l.kantite_resevwa,
                        prix_achat_gallon=prix, fournisseur=l.konpayi[:150],
-                       reference_camion=" · ".join(x for x in (l.plak_kamyon, f"Bon {l.no_bon}") if x)[:100],
+                       reference_camion=" · ".join(x for x in (l.plak_kamyon, l.no_bon and f"Bon {l.no_bon}") if x)[:100],
                        notes=f"{l.numero} — app Resepsyon. Voye {float(l.kantite_voye):g} gal, "
                              f"resevwa {float(l.kantite_resevwa):g} gal. Chofè {l.chofe}."[:500])
         sdb.add(lv)
@@ -475,7 +485,7 @@ def _modifier_stock(l: LivrezonKabiran) -> None:
             if l.pri_galon is not None:
                 lv.prix_achat_gallon = l.pri_galon
             lv.fournisseur = l.konpayi[:150]
-            lv.reference_camion = " · ".join(x for x in (l.plak_kamyon, f"Bon {l.no_bon}") if x)[:100]
+            lv.reference_camion = " · ".join(x for x in (l.plak_kamyon, l.no_bon and f"Bon {l.no_bon}") if x)[:100]
             sdb.commit()
 
 
@@ -699,12 +709,14 @@ def stations(_u: Utilisateur = Depends(_require_resepsyon)):
 
 
 def _nouvo(db: Session, v: dict, acteur) -> LivrezonKabiran:
+        numero = _prochain_numero(db)
         l = LivrezonKabiran(
-            numero=_prochain_numero(db), station_id=v["station_id"], station_nom=v["station_nom"],
+            numero=numero, station_id=v["station_id"], station_nom=v["station_nom"],
             produit_id=v["produit_id"], produit_nom=v["produit_nom"], date_livrezon=datetime.now(timezone.utc),  # dat & lè otomatik
-            no_kontre_plen=v["no_kontre_plen"], no_bon=v["no_bon"], no_bon_norm=v["no_bon_norm"],
+            no_kontre_plen=v["no_kontre_plen"], no_bon=v["no_bon"] or "",
+            no_bon_norm=v["no_bon_norm"] or f"~{numero}",                     # san bon : valè inik (anti-doublon)
             kantite_voye=v["kantite_voye"], pri_galon=v["pri_galon"], chofe=v["chofe"],
-            telefon_chofe=v["telefon_chofe"], plak_kamyon=v["plak_kamyon"], konpayi=v["konpayi"],
+            telefon_chofe=v["telefon_chofe"], plak_kamyon=v.get("plak_kamyon") or "", konpayi=v["konpayi"],
             komante=v["komante"], statut="VALIDE", cree_par_id=acteur.id)
         db.add(l)
         try:
@@ -1039,20 +1051,15 @@ def fiche_sections(d: dict) -> list:
     def v(x):
         return "—" if x in (None, "") else str(x)
 
-    jog = None
-    if d.get("jog_avan") is not None and d.get("jog_apre") is not None:
-        jog = round(d["jog_apre"] - d["jog_avan"], 3)
     return [
         ("Livrezon", [("Nimewo fich", v(d["numero"])), ("Estasyon", v(d["station_nom"])),
                       ("Tip kabiran", v(d["produit_nom"])), ("Dat & lè", dt_haiti(d["resevwa_at"] or d["date_livrezon"])),
                       ("Kontre plen", v(d["no_kontre_plen"])), ("Nimewo bon", v(d["no_bon"])),
                       ("Konpayi", v(d["konpayi"]))]),
-        ("Kamyon & chofè", [("Chofè", v(d["chofe"])), ("Telefòn chofè", v(d["telefon_chofe"])),
-                            ("Plak kamyon", v(d["plak_kamyon"]))]),
+        ("Chofè", [("Chofè", v(d["chofe"])), ("Telefòn chofè", v(d["telefon_chofe"]))]),
         ("Resepsyon", [("Kantite voye", g(d["kantite_voye"])), ("Kantite resevwa", g(d["kantite_resevwa"])),
                        ("Ekat", g(d["ekat"]) + (" (plis pase tolerans)" if d["statut"] == "EKAT" else "")),
-                       ("Jòj tank avan", g(d["jog_avan"])), ("Jòj tank apre", g(d["jog_apre"])),
-                       ("Diferans jòj", g(jog)), ("Estati", v(d["statut_label"]))]),
+                       ("Estati", v(d["statut_label"]))]),
         ("Lòt enfòmasyon", [("Kòmantè", v(d["komante"] or d.get("komante_resepsyon"))),
                             ("Resevwa pa", v(d["resevwa_par"] or d["cree_par"])),
                             ("Foto fèy la", f"{len(d.get('fotos') or [])} foto")]),
@@ -1279,9 +1286,10 @@ def modifye(lid: int, data: LivrezonPatch, request: Request, u: Utilisateur = De
         v["pri_galon"] = _f(v["pri_galon"])
         v.update({k: c for k, c in chan.items() if k not in ("date_livrezon", "kantite_resevwa")})
         v = _verifier(db, v, exclure_id=l.id)
+        v["no_bon_norm"] = v["no_bon_norm"] or f"~{l.numero}"
         for c in ("station_id", "station_nom", "produit_id", "produit_nom", "no_kontre_plen", "no_bon", "no_bon_norm",
                   "kantite_voye", "pri_galon", "chofe", "telefon_chofe", "plak_kamyon", "konpayi", "komante"):
-            setattr(l, c, v[c])
+            setattr(l, c, v[c] if v[c] is not None or c not in ("no_bon", "plak_kamyon") else "")
         if "date_livrezon" in chan:
             l.date_livrezon = _parse_date(chan["date_livrezon"])
         if "kantite_resevwa" in chan:

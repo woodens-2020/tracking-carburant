@@ -300,7 +300,7 @@ async function istorik(){
   if(!stations.length){ try{ stations = (await api('GET', '/api/resepsyon/stations')).stations; }catch(_){} }
   const P = [['tout', 'Tout'], ['jodi', 'Jodi a'], ['7', '7 dènye jou'], ['mwa', 'Mwa sa a'], ['mwa1', 'Mwa pase']];
   ecran('Istorik fich yo', `
-    <div class="rech"><input id="h-q" type="search" placeholder="Chèche : bon, kontre plen, chofè, plak, konpayi…" value="${esc(H.q)}" autocomplete="off"></div>
+    <div class="rech"><input id="h-q" type="search" placeholder="Chèche : kontre plen, nimewo livrezon, chofè, konpayi…" value="${esc(H.q)}" autocomplete="off"></div>
     ${stations.length > 1 ? `<div class="sel" style="margin-bottom:10px"><select id="h-st" onchange="H.station_id=this.value;chargerH()">
       <option value="">Tout estasyon yo</option>${stations.map(x => `<option value="${x.id}" ${String(x.id) === H.station_id ? 'selected' : ''}>${esc(x.nom)}</option>`).join('')}</select></div>` : ''}
     <div class="chips">${P.map(([k, t]) => `<button class="${H.per === k ? 'on' : ''}" onclick="H.per='${k}';document.querySelectorAll('.chips button').forEach(b=>b.classList.remove('on'));this.classList.add('on');chargerH()">${t}</button>`).join('')}</div>
@@ -385,7 +385,10 @@ document.addEventListener('change', () => { if($('#b-env')) sauver(); });
 document.addEventListener('visibilitychange', () => { if(document.hidden && $('#b-env')) sauver(true); });
 /* NB : nan yon atribi on…="" sou yon <input>, non « form » vle di input.form (null), pa varyab la.
    Se sa ki te fè fòm nan pa t janm kenbe sa moun tape (tout chan yo te parèt vid apre yon erè). */
-function majChamp(id, v){ form[id] = v; nettoyer(id); }
+function majChamp(id, v){
+  if(id === 'no_kontre_plen'){ const t = v.replace(/\D/g, ''); if(t !== v){ document.getElementById('i-' + id).value = t; v = t; } }
+  form[id] = v; nettoyer(id);
+}
 /* Chan : tit → endikasyon → kaz (youn anba lòt) */
 function champ(id, titre, hint, attrs = '', opt = false, unite = ''){
   const inp = `<input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="majChamp('${id}', this.value)">`;
@@ -438,27 +441,23 @@ function dessinerForm(erreurs){
     </div>
     <div class="card">
       <div class="sec-t"><span class="n">2</span>Livrezon</div>
-      ${champ('no_kontre_plen', 'Kontre plen', 'Enfòmasyon ki ekri sou fich kontre plen an.', 'autocapitalize="characters" placeholder="egz: KP-1024"')}
-      ${champ('no_bon', 'Nimewo bon livrezon', 'Nimewo ki sou bon konpayi a bay la.', 'autocapitalize="characters" placeholder="egz: BL-77881"')}
+      ${champ('no_kontre_plen', 'Kontre plen', 'Nonb antye sèlman : chif, san lèt, san vigil.', 'type="text" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off" placeholder="egz: 12"')}
+      ${champ('no_bon', 'Nimewo livrezon', 'Nimewo ki sou bon konpayi a bay la, si genyen.', 'autocapitalize="characters" placeholder="egz: BL-77881"', true)}
       ${champ('kantite_voye', 'Kantite voye', 'Kantite galon ki ekri sou bon livrezon an.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 3000"', false, 'galon')}
       ${champ('konpayi', 'Konpayi', 'Konpayi ki voye gaz la.', 'placeholder="egz: Sol, Total, Dinasa…"')}
       <div class="info">🕒<div><b>Dat & lè : otomatik</b>Sistèm nan anrejistre lè ou peze « Anrejistre ».</div></div>
     </div>
     <div class="card">
-      <div class="sec-t"><span class="n">3</span>Kamyon & chofè</div>
+      <div class="sec-t"><span class="n">3</span>Chofè</div>
       ${champ('chofe', 'Non chofè a', 'Non konplè moun k ap kondui kamyon an.', 'autocomplete="name" placeholder="egz: Pierre Jean"')}
       <div class="fld" id="f-telefon_chofe"><label for="i-telefon_chofe">Telefòn chofè a<span class="req">*</span></label>
         <div class="hint">8 chif, san +509.</div>
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
           value="${esc(form.telefon_chofe ?? '')}" oninput="majChamp('telefon_chofe', this.value)"></div><div class="ferr"></div></div>
-      ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an, si ou ka wè l.', 'autocapitalize="characters" placeholder="egz: AB-12345"', true)}
     </div>
     <div class="card">
       <div class="sec-t"><span class="n">4</span>Resepsyon</div>
       ${champ('kantite_resevwa', 'Kantite resevwa', 'Kantite galon ki antre vre nan tank lan lè kamyon an fin vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 2998" style="font-size:20px;font-weight:800"', false, 'galon')}
-      ${champ('jog_avan', 'Jòj tank lan avan', 'Kantite ki te nan tank lan anvan kamyon an vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 800" onchange="calcJogF()"', true, 'galon')}
-      ${champ('jog_apre', 'Jòj tank lan apre', 'Kantite ki nan tank lan apre kamyon an fin vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 3750" onchange="calcJogF()"', true, 'galon')}
-      <div id="jog-info" class="small muted" style="margin:-6px 0 12px"></div>
       <div class="fld" id="f-komante"><label for="i-komante">Kòmantè<span class="opt">opsyonèl</span></label>
         <div class="hint">Si gen yon pwoblèm oswa yon diferans, ekri l la.</div>
         <textarea id="i-komante" rows="3" oninput="majChamp('komante', this.value)">${esc(form.komante ?? '')}</textarea></div>
@@ -473,7 +472,6 @@ function dessinerForm(erreurs){
     </div>
     <div class="barre-bas"><button class="btn" id="b-env" onclick="envoyer()">✓ Anrejistre livrezon an</button></div>`, true);
   ligneStock();
-  calcJogF();
   if(erreurs && erreurs.length) montrerErreurs(erreurs);
 }
 function montrerErreurs(errs){
@@ -538,7 +536,9 @@ function verifierLocal(){
   const e = [];
   if(form.station_id == null) e.push({chan: 'station_id', message: 'Chwazi estasyon an.'});
   if(form.station_id != null && form.produit_id == null) e.push({chan: 'produit_id', message: 'Chwazi tip kabiran an.'});
-  for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè']])
+  if(String(form.no_kontre_plen || '').trim() && !/^[0-9]{1,9}$/.test(String(form.no_kontre_plen).trim()))
+    e.push({chan: 'no_kontre_plen', message: 'Kontre plen an dwe yon nonb antye (chif sèlman).'});
+  for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè']])
     if(!String(form[c] || '').trim()) e.push({chan: c, message: l + ' obligatwa.'});
   const q = nb(form.kantite_voye);
   if(isNaN(q) && String(form.kantite_voye || '').trim()) e.push({chan: 'kantite_voye', message: 'Ekri sèlman chif (egz: 3000 oswa 3000,5).'});
@@ -546,9 +546,6 @@ function verifierLocal(){
   const t = tel8(form.telefon_chofe);
   if(!/^[0-9]{8}$/.test(t)) e.push({chan: 'telefon_chofe', message: '8 chif apre +509 (egz: 3456 7890).'});
   if(!(nb(form.kantite_resevwa) > 0)) e.push({chan: 'kantite_resevwa', message: 'Kantite resevwa a dwe plis pase 0.'});
-  for(const c of ['jog_avan', 'jog_apre']) if(String(form[c] || '').trim() && isNaN(nb(form[c]))) e.push({chan: c, message: 'Ekri sèlman chif.'});
-  if(form.jog_avan && form.jog_apre && nb(form.jog_apre) < nb(form.jog_avan))
-    e.push({chan: 'jog_apre', message: 'Jòj apre a dwe pi wo pase jòj avan an.'});
   const nf = fotos.filter(Boolean).length;
   if(nf < 2) e.push({chan: 'fotos', message: nf ? 'Pran 2yèm foto fèy la.' : 'Pran 2 foto fèy livrezon an.'});
   return e;
@@ -562,10 +559,10 @@ async function envoyer(){
   const b = $('#b-env'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Ap anrejistre…';
   const num = v => v === '' || v == null ? null : nb(v);
   const corps = {station_id: form.station_id, produit_id: form.produit_id,
-    no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: voye,
+    no_bon: String(form.no_bon || '').trim() || null, no_kontre_plen: String(form.no_kontre_plen || '').trim(), kantite_voye: voye,
     chofe: form.chofe, telefon_chofe: '+509' + tel8(form.telefon_chofe),
-    plak_kamyon: form.plak_kamyon || null, konpayi: form.konpayi, komante: form.komante || null,
-    kantite_resevwa: q, jog_avan: num(form.jog_avan), jog_apre: num(form.jog_apre), fotos: fotos.filter(Boolean)};
+    konpayi: form.konpayi, komante: form.komante || null,
+    kantite_resevwa: q, fotos: fotos.filter(Boolean)};
   try{
     const l = await api('POST', '/api/resepsyon/livrezon/konple', corps);
     pile.pop(); fotos = [null, null]; form = {}; effacerBouyon();

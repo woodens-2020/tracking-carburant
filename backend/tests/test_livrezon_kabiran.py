@@ -74,7 +74,7 @@ def test_circuit_livrezon(client):
 
     base = {"station_id": eid, "produit_id": diesel_id, "no_bon": "BL-2026-001", "kantite_voye": 3000,
             "pri_galon": 600, "chofe": "Pierre Chofè", "telefon_chofe": "3456 7890", "plak_kamyon": "ab-12345",
-            "konpayi": "Sol Haïti", "no_kontre_plen": "KP-9"}
+            "konpayi": "Sol Haïti", "no_kontre_plen": "4417"}
     # Validation : téléphone, quantité, produit d'une autre station
     r = rc.post("/api/resepsyon/livrezon", json=dict(base, telefon_chofe="12", kantite_voye=0))
     assert r.status_code == 422
@@ -83,6 +83,9 @@ def test_circuit_livrezon(client):
     autre = max(principal_avant.values()) + 999
     r = rc.post("/api/resepsyon/livrezon", json=dict(base, no_kontre_plen=" "))
     assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "no_kontre_plen"
+    for mal in ("KP-9", "12,5", "-3"):                                   # kontre plen = nonb antye
+        r = rc.post("/api/resepsyon/livrezon", json=dict(base, no_kontre_plen=mal))
+        assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "no_kontre_plen", mal
     r = rc.post("/api/resepsyon/livrezon", json=dict(base, produit_id=autre))
     assert r.status_code == 422 and r.json()["detail"]["erreurs"][0]["chan"] == "produit_id"
 
@@ -132,8 +135,9 @@ def test_circuit_livrezon(client):
     # Fich konplè : tout sa resepsyon an antre (PDF + mesaj WhatsApp menm kontni), foto yo sou paj 2
     dk = rc.get(f"/api/resepsyon/livrezon/{kp['id']}").json()
     fich = {k: v for s in dk["fich"] for k, v in s["lignes"]}
-    assert fich["Kantite resevwa"] == "2 995 gal" and fich["Jòj tank apre"] == "3 095 gal" and fich["Diferans jòj"] == "2 995 gal"
-    assert fich["Kontre plen"] == "KP-9" and fich["Plak kamyon"] == "—" and fich["Foto fèy la"] == "2 foto"
+    assert fich["Kantite resevwa"] == "2 995 gal" and fich["Ekat"] == "5 gal"
+    assert fich["Kontre plen"] == "4417" and fich["Foto fèy la"] == "2 foto"
+    assert not {"Plak kamyon", "Jòj tank avan", "Jòj tank apre", "Diferans jòj"} & fich.keys()
     r = rc.get(f"/api/resepsyon/livrezon/{kp['id']}/pdf")
     assert r.status_code == 200 and r.content.count(b"/Type /Page\n") + r.content.count(b"/Type /Page\r") + r.content.count(b"/Type /Page ") >= 2
     # Istorik : rechèch, estasyon, paj
@@ -142,6 +146,17 @@ def test_circuit_livrezon(client):
     assert rc.get("/api/resepsyon/livrezon", params={"station_id": eid, "limit": 1}).json()["limit"] == 1
     assert rc.get("/api/resepsyon/livrezon", params={"station_id": 999999}).json()["total"] == 0
     assert p.post(f"/api/livrezon-admin/livrezon/{kp['id']}/anile", json={"motif": "Test konple"}).status_code == 200
+    # Nimewo bon opsyonèl : plizyè livrezon san bon pa bloke youn lòt ; kontre plen « 0012 » → « 12 »
+    san = []
+    for _ in range(2):
+        r = rc.post("/api/resepsyon/livrezon/konple", json=dict(k, no_bon=None, no_kontre_plen="0012", fotos=[png, png]))
+        assert r.status_code == 201, r.text
+        assert r.json()["no_bon"] == "" and r.json()["no_kontre_plen"] == "12"
+        san.append(r.json()["id"])
+    fich2 = {k2: v2 for sc in rc.get(f"/api/resepsyon/livrezon/{san[0]}").json()["fich"] for k2, v2 in sc["lignes"]}
+    assert fich2["Nimewo bon"] == "—"
+    for i in san:
+        assert p.post(f"/api/livrezon-admin/livrezon/{i}/anile", json={"motif": "Test san bon"}).status_code == 200
     assert round(_stock(sch, "Diesel")[0] - d_avan, 3) == 0
     # Admin : approuver → en route
     r = p.post(f"/api/livrezon-admin/livrezon/{l['id']}/apwouve", json={})
@@ -184,7 +199,7 @@ def test_circuit_livrezon(client):
     assert g["totaux"] == [{"produit": "Diesel", "kamyon": 2, "voye": 8000, "resevwa": 7898, "ekat": 102}]
     assert g["produits"] == ["Diesel"] and g["konpayis"] == ["Sol Haïti"]
     assert p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}&produit=Gazoline").json()["lignes"] == []
-    assert len(p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}&q=KP-9").json()["lignes"]) == 2
+    assert len(p.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}&q=4417").json()["lignes"]) == 2
     r = p.get(f"/api/livrezon-admin/resepsyon-lis.csv?station_id={eid}")
     assert r.status_code == 200 and "Station Livrezon" in r.text and "4900" in r.text
     assert rc.get(f"/api/livrezon-admin/resepsyon-lis?station_id={eid}").status_code == 403
