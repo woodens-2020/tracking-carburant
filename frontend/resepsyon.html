@@ -103,7 +103,28 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box
 .f-err .fslot:not(.ok){border-color:var(--err);background:var(--errbg)}
 .vignettes{display:grid;grid-template-columns:1fr 1fr;gap:10px} .vignettes a{display:block;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#e9eef3}
 .vignettes img{width:100%;height:100%;object-fit:cover;display:block}
-.vide{text-align:center;padding:30px 18px;color:var(--mut)} .vide .e{font-size:40px;margin-bottom:6px}
+.vide{text-align:center;padding:30px 18px;color:var(--mut)}
+.fld,.card{scroll-margin-top:84px;scroll-margin-bottom:110px}
+/* Lè klavye a louvri, bouton an pa kouvri chan an */
+body:has(main input:focus, main textarea:focus) .barre-bas{position:static}
+body:has(main input:focus, main textarea:focus) .fab{display:none}
+@media (max-width:380px){
+  main{padding:12px 10px 110px}
+  .card{padding:14px 13px;border-radius:16px;margin-bottom:12px}
+  .barre-bas{margin:0 -10px;padding-left:10px;padding-right:10px}
+  .top{padding-left:10px;padding-right:10px} .top h1{font-size:16.5px}
+  .hero{padding:15px;border-radius:18px} .hero .stats b{font-size:19px} .hero .nm{font-size:18px}
+  .big{font-size:27px}
+  .fotos,.vignettes{gap:8px} .fslot{font-size:13px} .fslot .ic{font-size:28px}
+  .kv{font-size:14px;gap:8px 10px}
+  .fld>label{font-size:15px} .fld .hint{font-size:13px}
+  input,select,textarea{padding:12px 13px;min-height:50px}
+  .btn{font-size:16px;padding:15px 14px}
+  .fab{left:10px;right:10px}
+  .item{padding:12px;gap:10px} .item .av{width:40px;height:40px;font-size:19px}
+  .pad{gap:10px} .pad button{height:58px}
+}
+@media (max-width:340px){ .fotos{grid-template-columns:1fr} .fslot{aspect-ratio:4/3} .kv{grid-template-columns:1fr} .kv dd{text-align:left;margin-bottom:4px} } .vide .e{font-size:40px;margin-bottom:6px}
 /* Connexion */
 .login{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center}
 .logo{text-align:center;margin:10px 0 18px} .logo img{width:92px;height:92px;border-radius:24px;box-shadow:0 12px 30px rgba(15,118,110,.3)}
@@ -136,13 +157,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nb = v => { const t = String(v ?? '').replace(/\s/g, '').replace(',', '.'); return t === '' ? NaN : Number(t); };
 const gal = x => x == null ? '—' : Number(x).toLocaleString('fr-FR', {maximumFractionDigits: 3}) + ' gal';
 const dt = s => s ? new Date(s).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
 const ST = {VALIDE:'Valide', AN_WOUT:'An wout', RESEVWA:'Resevwa', FEMEN:'Fèmen', EKAT:'Ekat', REJTE:'Rejte', ANILE:'Anile'};
 const badge = s => `<span class="badge s-${s}">${ST[s] || s}</span>`;
 const COUL = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#eab308', '#06b6d4'];
 const charge = `<div class="vide"><span class="spin d"></span></div>`;
-let moi = null, stations = [], pile = [], form = {}, fotos = [null, null];
+let moi = null, stations = [], pile = [], form = {}, fotos = [null, null], navTok = 0;
 
 async function api(method, path, body){
   const r = await fetch(path, {method, credentials: 'same-origin', headers: body ? {'Content-Type': 'application/json'} : {},
@@ -218,14 +240,17 @@ async function deconnecter(){
 /* ── Accueil ───────────────────────────────────────────── */
 async function demarrer(){
   try{ moi = await api('GET', '/api/resepsyon/me'); }catch(e){ moi = null; return ecranCode(); }
-  pile = []; accueil();
+  pile = []; await accueil();
+  if(pile.length === 1 && lireBouyon()) aller(nouveau);
 }
 async function accueil(){
-  pile = [accueil];
+  pile = [accueil]; if($('#b-env')) sauver(true);
   ecran('Livrezon kabiran', charge);
+  const tok = ++navTok;
   let L = [];
   try{ L = (await api('GET', '/api/resepsyon/livrezon')).livrezons; }
   catch(e){ if(e.status === 401) return ecranCode(); return ecran('Livrezon kabiran', `<div class="alert err">${esc(e.message)}</div>`); }
+  if(tok !== navTok) return;
   const jodi = new Date().toDateString();
   const bon = L.filter(l => l.statut !== 'ANILE' && l.statut !== 'REJTE');
   const nJodi = bon.filter(l => new Date(l.resevwa_at || l.date_livrezon).toDateString() === jodi).length;
@@ -254,14 +279,52 @@ function item(l){
 /* ── Formulaire de livraison ───────────────────────────── */
 async function nouveau(){
   ecran('Nouvo livrezon', charge, true);
+  const tok = ++navTok;
   try{ stations = (await api('GET', '/api/resepsyon/stations')).stations; }
   catch(e){ return ecran('Nouvo livrezon', `<div class="alert err">${esc(e.message)}</div>`, true); }
-  form = {station_id: stations.length === 1 ? stations[0].id : null}; fotos = [null, null];
+  if(tok !== navTok) return;                 // yon lòt ekran louvri pandan chajman an
+  const b = lireBouyon();
+  if(b){
+    form = b.form || {}; fotos = (b.fotos && b.fotos.length === 2) ? b.fotos : [null, null];
+    const st = stations.find(x => x.id === form.station_id);
+    if(!st){ form.station_id = null; form.produit_id = null; }
+    else if(!st.produits.some(p => p.id === form.produit_id)) form.produit_id = null;
+  } else { form = {station_id: stations.length === 1 ? stations[0].id : null}; fotos = [null, null]; }
   dessinerForm();
+  if(b) $('#form-alert').innerHTML = `<div class="alert warn">📝 Nou rekipere fòm ou t ap ranpli a.
+    ${fotos.every(Boolean) ? '' : 'Tcheke foto yo. '}<a href="#" style="color:inherit;font-weight:800" onclick="fomVid();return false">Kòmanse yon fòm vid</a></div>`;
 }
+/* Bouyon fòm nan */
+const BR = 'resepsyon-bouyon';
+let tBr = null;
+function sauver(tout_de_suite){
+  clearTimeout(tBr);
+  const f = () => { const d = {t: Date.now(), u: moi && moi.id, form, fotos};
+    try{ localStorage.setItem(BR, JSON.stringify(d)); }
+    catch(_){ try{ localStorage.setItem(BR, JSON.stringify(Object.assign(d, {fotos: [null, null]}))); }catch(__){} } };
+  tout_de_suite ? f() : (tBr = setTimeout(f, 300));
+}
+function lireBouyon(){
+  try{
+    const b = JSON.parse(localStorage.getItem(BR) || 'null');
+    if(b && b.u === (moi && moi.id) && Date.now() - b.t < 24 * 3600e3 &&
+       (Object.keys(b.form || {}).some(k => k !== 'station_id' && k !== 'produit_id' && String(b.form[k] ?? '').trim()) || (b.fotos || []).some(Boolean))) return b;
+  }catch(_){}
+  return null;
+}
+function effacerBouyon(){ clearTimeout(tBr); try{ localStorage.removeItem(BR); }catch(_){} }
+function fomVid(){
+  effacerBouyon(); form = {station_id: stations.length === 1 ? stations[0].id : null}; fotos = [null, null]; dessinerForm();
+}
+document.addEventListener('input', () => { if($('#b-env')) sauver(); });
+document.addEventListener('change', () => { if($('#b-env')) sauver(); });
+document.addEventListener('visibilitychange', () => { if(document.hidden && $('#b-env')) sauver(true); });
+/* NB : nan yon atribi on…="" sou yon <input>, non « form » vle di input.form (null), pa varyab la.
+   Se sa ki te fè fòm nan pa t janm kenbe sa moun tape (tout chan yo te parèt vid apre yon erè). */
+function majChamp(id, v){ form[id] = v; nettoyer(id); }
 /* Chan : tit → endikasyon → kaz (youn anba lòt) */
 function champ(id, titre, hint, attrs = '', opt = false, unite = ''){
-  const inp = `<input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="form['${id}']=this.value;nettoyer('${id}')">`;
+  const inp = `<input id="i-${id}" ${attrs} value="${esc(form[id] ?? '')}" oninput="majChamp('${id}', this.value)">`;
   return `<div class="fld" id="f-${id}"><label for="i-${id}">${titre}${opt ? '<span class="opt">opsyonèl</span>' : '<span class="req">*</span>'}</label>
     <div class="hint">${hint}</div>${unite ? `<div class="unit">${inp}<b>${unite}</b></div>` : inp}<div class="ferr"></div></div>`;
 }
@@ -295,7 +358,7 @@ function choisirProduit(v){
 function dessinerForm(erreurs){
   const st = stations.find(s => s.id === form.station_id);
   ecran('Nouvo livrezon', `
-    ${erreurs && erreurs.length ? `<div class="alert err">Gen ${erreurs.length} erè : korije chan ki an wouj yo.</div>` : ''}
+    <div id="form-alert"></div>
     <div class="card">
       <div class="sec-t"><span class="n">1</span>Estasyon & kabiran</div>
       <div class="fld" id="f-station_id"><label for="i-station">Estasyon<span class="req">*</span></label>
@@ -313,7 +376,7 @@ function dessinerForm(erreurs){
       <div class="sec-t"><span class="n">2</span>Livrezon</div>
       ${champ('no_kontre_plen', 'Kontre plen', 'Enfòmasyon ki ekri sou fich kontre plen an.', 'autocapitalize="characters" placeholder="egz: KP-1024"')}
       ${champ('no_bon', 'Nimewo bon livrezon', 'Nimewo ki sou bon konpayi a bay la.', 'autocapitalize="characters" placeholder="egz: BL-77881"')}
-      ${champ('kantite_voye', 'Kantite voye', 'Kantite galon ki ekri sou bon livrezon an.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3000"', false, 'galon')}
+      ${champ('kantite_voye', 'Kantite voye', 'Kantite galon ki ekri sou bon livrezon an.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 3000"', false, 'galon')}
       ${champ('konpayi', 'Konpayi', 'Konpayi ki voye gaz la.', 'placeholder="egz: Sol, Total, Dinasa…"')}
       <div class="info">🕒<div><b>Dat & lè : otomatik</b>Sistèm nan anrejistre lè ou peze « Anrejistre ».</div></div>
     </div>
@@ -323,18 +386,18 @@ function dessinerForm(erreurs){
       <div class="fld" id="f-telefon_chofe"><label for="i-telefon_chofe">Telefòn chofè a<span class="req">*</span></label>
         <div class="hint">8 chif, san +509.</div>
         <div class="tel"><span>+509</span><input id="i-telefon_chofe" type="tel" inputmode="numeric" maxlength="11" placeholder="3456 7890"
-          value="${esc(form.telefon_chofe ?? '')}" oninput="form.telefon_chofe=this.value;nettoyer('telefon_chofe')"></div><div class="ferr"></div></div>
+          value="${esc(form.telefon_chofe ?? '')}" oninput="majChamp('telefon_chofe', this.value)"></div><div class="ferr"></div></div>
       ${champ('plak_kamyon', 'Plak kamyon an', 'Nimewo plak ki sou kamyon an, si ou ka wè l.', 'autocapitalize="characters" placeholder="egz: AB-12345"', true)}
     </div>
     <div class="card">
       <div class="sec-t"><span class="n">4</span>Resepsyon</div>
-      ${champ('kantite_resevwa', 'Kantite resevwa', 'Kantite galon ki antre vre nan tank lan lè kamyon an fin vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 2998" style="font-size:20px;font-weight:800"', false, 'galon')}
-      ${champ('jog_avan', 'Jòj tank lan avan', 'Kantite ki te nan tank lan anvan kamyon an vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 800" onchange="calcJogF()"', true, 'galon')}
-      ${champ('jog_apre', 'Jòj tank lan apre', 'Kantite ki nan tank lan apre kamyon an fin vide.', 'type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3750" onchange="calcJogF()"', true, 'galon')}
+      ${champ('kantite_resevwa', 'Kantite resevwa', 'Kantite galon ki antre vre nan tank lan lè kamyon an fin vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 2998" style="font-size:20px;font-weight:800"', false, 'galon')}
+      ${champ('jog_avan', 'Jòj tank lan avan', 'Kantite ki te nan tank lan anvan kamyon an vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 800" onchange="calcJogF()"', true, 'galon')}
+      ${champ('jog_apre', 'Jòj tank lan apre', 'Kantite ki nan tank lan apre kamyon an fin vide.', 'type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 3750" onchange="calcJogF()"', true, 'galon')}
       <div id="jog-info" class="small muted" style="margin:-6px 0 12px"></div>
       <div class="fld" id="f-komante"><label for="i-komante">Kòmantè<span class="opt">opsyonèl</span></label>
         <div class="hint">Si gen yon pwoblèm oswa yon diferans, ekri l la.</div>
-        <textarea id="i-komante" rows="3" oninput="form.komante=this.value">${esc(form.komante ?? '')}</textarea></div>
+        <textarea id="i-komante" rows="3" oninput="majChamp('komante', this.value)">${esc(form.komante ?? '')}</textarea></div>
     </div>
     <div class="card">
       <div class="sec-t"><span class="n">5</span>Foto fèy livrezon an</div>
@@ -346,8 +409,18 @@ function dessinerForm(erreurs){
     </div>
     <div class="barre-bas"><button class="btn" id="b-env" onclick="envoyer()">✓ Anrejistre livrezon an</button></div>`, true);
   ligneStock();
-  (erreurs || []).forEach(e => marquer(e.chan, e.message));
-  if(erreurs && erreurs.length){ const z = document.getElementById('f-' + erreurs[0].chan); if(z) z.scrollIntoView({block: 'center'}); }
+  calcJogF();
+  if(erreurs && erreurs.length) montrerErreurs(erreurs);
+}
+function montrerErreurs(errs){
+  document.querySelectorAll('.f-err').forEach(z => z.classList.remove('f-err'));
+  const sans = [];
+  errs.forEach(e => { if(document.getElementById('f-' + e.chan)) marquer(e.chan, e.message); else sans.push(e.message); });
+  const a = $('#form-alert');
+  a.innerHTML = `<div class="alert err">⚠ ${errs.length === 1 ? '1 enfòmasyon manke oswa pa bon' : errs.length + ' enfòmasyon manke oswa pa bon'} : korije chan ki an wouj yo.
+    ${sans.length ? '<br>' + sans.map(esc).join('<br>') : ''}<div class="small" style="font-weight:600;margin-top:4px">Tout lòt enfòmasyon ou te mete yo toujou la.</div></div>`;
+  const prem = errs.find(e => document.getElementById('f-' + e.chan));
+  (prem ? document.getElementById('f-' + prem.chan) : a).scrollIntoView({block: 'center', behavior: 'smooth'});
 }
 function slotFoto(i){
   const f = fotos[i];
@@ -378,32 +451,39 @@ async function prendreFoto(inp){
   try{ fotos[i] = await comprimer(file); }catch(e){ alert(e.message); }
   z.outerHTML = slotFoto(i);
   if(fotos.every(Boolean)) nettoyer('fotos');
+  sauver(true);
 }
 function calcJogF(){
   const a = form.jog_avan, p = form.jog_apre, z = $('#jog-info'); if(!z) return;
   if(a && p){
-    if(Number(p) < Number(a)){ z.textContent = 'Jòj apre a dwe pi wo pase jòj avan an.'; z.style.color = 'var(--err)'; return; }
-    const d = Number(p) - Number(a);
-    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(d)}</b> · <a href="#" style="color:var(--pri);font-weight:700" onclick="form.kantite_resevwa='${d.toFixed(3)}';$('#i-kantite_resevwa').value='${d.toFixed(3)}';nettoyer('kantite_resevwa');return false">itilize l kòm kantite resevwa</a>`;
+    if(nb(p) < nb(a)){ z.textContent = 'Jòj apre a dwe pi wo pase jòj avan an.'; z.style.color = 'var(--err)'; return; }
+    const d = nb(p) - nb(a); if(isNaN(d)){ z.textContent = ''; return; }
+    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(d)}</b> · <a href="#" style="color:var(--pri);font-weight:700" onclick="majChamp('kantite_resevwa', '${d.toFixed(3)}');$('#i-kantite_resevwa').value='${d.toFixed(3)}';return false">itilize l kòm kantite resevwa</a>`;
   } else z.textContent = '';
 }
 function marquer(chan, msg){
   const z = document.getElementById('f-' + chan); if(!z) return;
   z.classList.add('f-err'); const m = z.querySelector('.ferr'); if(m) m.textContent = msg;
 }
-function nettoyer(chan){ const z = document.getElementById('f-' + chan); if(z) z.classList.remove('f-err'); }
+function nettoyer(chan){
+  const z = document.getElementById('f-' + chan); if(z) z.classList.remove('f-err');
+  const a = $('#form-alert'); if(a && a.querySelector('.err') && !document.querySelector('.f-err')) a.innerHTML = '';
+}
+function tel8(v){ const d = String(v || '').replace(/\D/g, ''); return d.length === 11 && d.startsWith('509') ? d.slice(3) : d; }
 function verifierLocal(){
   const e = [];
   if(form.station_id == null) e.push({chan: 'station_id', message: 'Chwazi estasyon an.'});
   if(form.station_id != null && form.produit_id == null) e.push({chan: 'produit_id', message: 'Chwazi tip kabiran an.'});
   for(const [c, l] of [['no_kontre_plen', 'Kontre plen'], ['no_bon', 'No bon livrezon'], ['konpayi', 'Konpayi'], ['chofe', 'Chofè']])
     if(!String(form[c] || '').trim()) e.push({chan: c, message: l + ' obligatwa.'});
-  const q = Number(form.kantite_voye);
-  if(!(q > 0)) e.push({chan: 'kantite_voye', message: 'Kantite a dwe plis pase 0.'});
-  const t = String(form.telefon_chofe || '').replace(/\D/g, '');
+  const q = nb(form.kantite_voye);
+  if(isNaN(q) && String(form.kantite_voye || '').trim()) e.push({chan: 'kantite_voye', message: 'Ekri sèlman chif (egz: 3000 oswa 3000,5).'});
+  else if(!(q > 0)) e.push({chan: 'kantite_voye', message: 'Kantite a dwe plis pase 0.'});
+  const t = tel8(form.telefon_chofe);
   if(!/^[0-9]{8}$/.test(t)) e.push({chan: 'telefon_chofe', message: '8 chif apre +509 (egz: 3456 7890).'});
-  if(!(Number(form.kantite_resevwa) > 0)) e.push({chan: 'kantite_resevwa', message: 'Kantite resevwa a dwe plis pase 0.'});
-  if(form.jog_avan && form.jog_apre && Number(form.jog_apre) < Number(form.jog_avan))
+  if(!(nb(form.kantite_resevwa) > 0)) e.push({chan: 'kantite_resevwa', message: 'Kantite resevwa a dwe plis pase 0.'});
+  for(const c of ['jog_avan', 'jog_apre']) if(String(form[c] || '').trim() && isNaN(nb(form[c]))) e.push({chan: c, message: 'Ekri sèlman chif.'});
+  if(form.jog_avan && form.jog_apre && nb(form.jog_apre) < nb(form.jog_avan))
     e.push({chan: 'jog_apre', message: 'Jòj apre a dwe pi wo pase jòj avan an.'});
   const nf = fotos.filter(Boolean).length;
   if(nf < 2) e.push({chan: 'fotos', message: nf ? 'Pran 2yèm foto fèy la.' : 'Pran 2 foto fèy livrezon an.'});
@@ -411,24 +491,25 @@ function verifierLocal(){
 }
 async function envoyer(){
   const e = verifierLocal();
-  if(e.length) return dessinerForm(e);
-  const voye = Number(form.kantite_voye), q = Number(form.kantite_resevwa), tol = moi.tolerans_galon ?? 5;
+  if(e.length) return montrerErreurs(e);
+  const voye = nb(form.kantite_voye), q = nb(form.kantite_resevwa), tol = moi.tolerans_galon ?? 5;
   const tolL = Math.max(tol, voye * (moi.tolerans_pct ?? 0.5) / 100);
   if(Math.abs(voye - q) > tolL && !confirm(`Voye ${gal(voye)}, resevwa ${gal(q)} : ekat ${gal(voye - q)}. Direksyon an ap resevwa yon alèt. Konfime?`)) return;
   const b = $('#b-env'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Ap anrejistre…';
-  const num = v => v === '' || v == null ? null : Number(v);
+  const num = v => v === '' || v == null ? null : nb(v);
   const corps = {station_id: form.station_id, produit_id: form.produit_id,
     no_bon: form.no_bon, no_kontre_plen: form.no_kontre_plen, kantite_voye: voye,
-    chofe: form.chofe, telefon_chofe: '+509' + String(form.telefon_chofe).replace(/\D/g, ''),
+    chofe: form.chofe, telefon_chofe: '+509' + tel8(form.telefon_chofe),
     plak_kamyon: form.plak_kamyon || null, konpayi: form.konpayi, komante: form.komante || null,
     kantite_resevwa: q, jog_avan: num(form.jog_avan), jog_apre: num(form.jog_apre), fotos: fotos.filter(Boolean)};
   try{
     const l = await api('POST', '/api/resepsyon/livrezon/konple', corps);
-    pile.pop(); fotos = [null, null];
+    pile.pop(); fotos = [null, null]; form = {}; effacerBouyon();
     aller(() => detail(l.id, 'Livrezon anrejistre — stock ' + l.station_nom + ' mete ajou. Ou ka pataje fèy la sou WhatsApp.'));
   }catch(err){
-    if(err.erreurs) return dessinerForm(err.erreurs);
     b.disabled = false; b.textContent = '✓ Anrejistre livrezon an';
+    if(err.status === 401){ sauver(true); alert('Sesyon an fini : konekte ankò. Fòm ou a sove, l ap tounen lè ou konekte.'); return ecranCode(); }
+    if(err.erreurs) return montrerErreurs(err.erreurs);
     alert(err.message);
   }
 }
@@ -470,13 +551,13 @@ async function detail(id, msg){
       <div class="info" style="margin:0 0 6px">ℹ️<div>Fè sa lè kamyon an fin vide nan tank lan. Stock ${esc(l.produit_nom)} ${esc(l.station_nom)} ap monte otomatikman.</div></div>
       <div class="fld" id="f-kantite_resevwa"><label for="r-q">Kantite resevwa<span class="req">*</span></label>
         <div class="hint">Kantite galon ki antre vre nan tank lan (voye : ${gal(l.kantite_voye)}).</div>
-        <div class="unit"><input id="r-q" type="number" inputmode="decimal" step="0.001" min="0" value="${l.kantite_voye}" style="font-size:20px;font-weight:800"><b>galon</b></div><div class="ferr"></div></div>
+        <div class="unit"><input id="r-q" type="text" inputmode="decimal" autocomplete="off" value="${l.kantite_voye}" style="font-size:20px;font-weight:800"><b>galon</b></div><div class="ferr"></div></div>
       <div class="fld"><label for="r-a">Jòj tank lan avan<span class="opt">opsyonèl</span></label>
         <div class="hint">Kantite ki te nan tank lan anvan kamyon an vide.</div>
-        <div class="unit"><input id="r-a" type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 800" oninput="calcJog()"><b>galon</b></div></div>
+        <div class="unit"><input id="r-a" type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 800" oninput="calcJog()"><b>galon</b></div></div>
       <div class="fld"><label for="r-p">Jòj tank lan apre<span class="opt">opsyonèl</span></label>
         <div class="hint">Kantite ki nan tank lan apre kamyon an fin vide.</div>
-        <div class="unit"><input id="r-p" type="number" inputmode="decimal" step="0.001" min="0" placeholder="egz: 3750" oninput="calcJog()"><b>galon</b></div>
+        <div class="unit"><input id="r-p" type="text" inputmode="decimal" autocomplete="off" placeholder="egz: 3750" oninput="calcJog()"><b>galon</b></div>
         <div id="jog-info" class="small muted" style="margin-top:8px"></div></div>
       <div class="fld"><label for="r-c">Kòmantè<span class="opt">opsyonèl</span></label>
         <div class="hint">Si gen yon pwoblèm oswa yon diferans, ekri l la.</div>
@@ -513,19 +594,19 @@ async function partagerWA(){
   window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener');
 }
 function calcJog(){
-  const a = Number($('#r-a').value), p = Number($('#r-p').value), z = $('#jog-info');
+  const a = nb($('#r-a').value), p = nb($('#r-p').value), z = $('#jog-info');
   if($('#r-a').value && $('#r-p').value){
     if(p < a){ z.textContent = 'Jòj apre a dwe pi wo pase jòj avan an.'; z.style.color = 'var(--err)'; return; }
-    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(p - a)}</b> <a href="#" style="color:var(--pri)" onclick="$('#r-q').value=${(p - a).toFixed(3)};return false">→ itilize l kòm kantite resevwa</a>`;
+    z.style.color = ''; z.innerHTML = `Diferans jòj : <b>${gal(p - a)}</b> <a href="#" style="color:var(--pri)" onclick="$('#r-q').value='${(p - a).toFixed(3)}';return false">→ itilize l kòm kantite resevwa</a>`;
   } else z.textContent = '';
 }
 async function recevoir(id, voye, tol){
-  const q = Number($('#r-q').value);
+  const q = nb($('#r-q').value);
   if(!(q > 0)) return marquer('kantite_resevwa', 'Kantite resevwa a dwe plis pase 0.');
   const ekat = voye - q;
   if(Math.abs(ekat) > tol && !confirm(`Ekat ${gal(ekat)} (plis pase tolerans ${gal(tol)}). Direksyon an ap resevwa yon alèt. Konfime?`)) return;
   const b = $('#b-rec'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Ap konfime…';
-  const num = v => v === '' ? null : Number(v);
+  const num = v => v === '' ? null : nb(v);
   try{
     const l = await api('POST', `/api/resepsyon/livrezon/${id}/resevwa`,
       {kantite_resevwa: q, jog_avan: num($('#r-a').value), jog_apre: num($('#r-p').value), komante: $('#r-c').value || null});
